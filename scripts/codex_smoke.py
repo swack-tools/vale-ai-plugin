@@ -8,10 +8,11 @@ import subprocess
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from smoke_support import temporary_workspace
+from smoke_support import temporary_workspace, isolated_environment, evidence_directory, fixture_repository, assert_lifecycle, advance_fixture, UPGRADE_MARKER
 
 REPO = Path(__file__).resolve().parents[1]
 requests = []
+unresolved = False
 
 
 class Fixture(BaseHTTPRequestHandler):
@@ -24,7 +25,7 @@ class Fixture(BaseHTTPRequestHandler):
         index = len(requests)
         tools = {t['name']: t for t in request.get('tools', []) if 'name' in t}
         if index in (1, 3):
-            text = 'We will use this, e.g. for testing.' if index == 1 else 'Use this file for testing.'
+            text = 'We will use this, e.g. for testing.' if index == 1 or unresolved else 'Use this file for testing.'
             command = f"printf '%s\\n' '{text}' > smoke.md"
             if 'exec_command' in tools:
                 name, args = 'exec_command', {'cmd': command, 'yield_time_ms': 1000}
@@ -54,23 +55,33 @@ class Fixture(BaseHTTPRequestHandler):
 
 
 def main():
+    global unresolved
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--plugin', action='store_true', help='Install the repository marketplace instead of project hooks.')
     parser.add_argument('--feedback-scope', choices=('changed-files', 'new-findings'), default='changed-files')
     parser.add_argument('--skill', choices=('check-prose', 'procedural-prose'), default='check-prose')
+    parser.add_argument('--output-dir', type=Path, help='Fresh directory for this run; existing directories are rejected.')
+    parser.add_argument('--unresolved', action='store_true', help='Leave findings after the correction pass and inspect active Stop.')
+    parser.add_argument('--upgrade', action='store_true', help='Update the disposable plugin before checking discovery.')
     args = parser.parse_args()
+    if args.upgrade and not args.plugin:
+        parser.error('--upgrade requires --plugin')
+    unresolved = args.unresolved
+    evidence = evidence_directory(args.output_dir, REPO, 'codex')
     requests.clear()
     with temporary_workspace(prefix='vale-codex-smoke-') as tmp:
         base = Path(tmp).resolve()
-        project = base / 'project'
+        trace_path = evidence / 'hook-events.jsonl'
+        source = fixture_repository(REPO, base, trace_path)
+        project = base / 'project with spaces'
         home = base / 'codex'
-        project.mkdir(); home.mkdir()
+        project.mkdir(); home.mkdir(exist_ok=True)
         subprocess.run(['git', 'init', '-q', str(project)], check=True)
         (project / '.vale-plugin.toml').write_text(
             f'scope = "{args.feedback_scope}"\ninclude = ["smoke.md"]\n')
-        env = dict(os.environ, CODEX_HOME=str(home))
+        env = isolated_environment(base)
         if not args.plugin:
-            subprocess.run(['python3', str(REPO / 'scripts/install.py'), '--project', str(project)], check=True, capture_output=True)
+            subprocess.run(['python3', str(source / 'scripts/install.py'), '--project', str(project)], check=True, capture_output=True, env=env, timeout=60)
         server = ThreadingHTTPServer(('127.0.0.1', 0), Fixture)
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
@@ -88,10 +99,15 @@ trust_level = "trusted"
 '''
         (home / 'config.toml').write_text(config)
         if args.plugin:
-            for command in (['codex', 'plugin', 'marketplace', 'add', str(REPO)],
+            for command in (['codex', 'plugin', 'marketplace', 'add', str(source)],
                             ['codex', 'plugin', 'add', 'vale@vale']):
                 install = subprocess.run(command, env=env, cwd=project, capture_output=True, text=True, timeout=60)
                 assert install.returncode == 0, install.stdout + install.stderr
+        if args.upgrade:
+            advance_fixture(source, env)
+            for command in (['codex', 'plugin', 'add', 'vale@vale'],):
+                refreshed = subprocess.run(command, env=env, cwd=project, capture_output=True, text=True, timeout=60)
+                assert refreshed.returncode == 0, refreshed.stdout + refreshed.stderr
         try:
             result = subprocess.run(['codex', 'exec', '--ephemeral', '--dangerously-bypass-hook-trust',
                                      '-C', str(project), '-s', 'danger-full-access', '--json',
@@ -100,14 +116,15 @@ trust_level = "trusted"
                                     env=env, capture_output=True, text=True, timeout=90)
         finally:
             server.shutdown()
-        evidence = REPO / '.research'
-        evidence.mkdir(exist_ok=True)
         (evidence / 'codex-smoke.jsonl').write_text(result.stdout)
         (evidence / 'codex-smoke.stderr').write_text(result.stderr)
         (evidence / 'codex-smoke-requests.json').write_text(json.dumps(requests, indent=2))
+        print('Evidence: ' + str(evidence))
         print(result.stdout[-5000:])
         print(result.stderr[-1500:])
         assert result.returncode == 0, result.returncode
+        if args.upgrade:
+            assert UPGRADE_MARKER in json.dumps(requests[0]), 'Client used stale skill content after upgrade'
         if args.plugin:
             assert 'vale:check-prose' in json.dumps(requests[0]), 'Codex did not discover the checking skill'
             assert 'vale:google-prose' in json.dumps(requests[0]), 'Codex did not discover the writing skill'
@@ -120,7 +137,13 @@ trust_level = "trusted"
             received = json.dumps(requests[1:])
             assert 'new/actionable' in received, 'Client did not receive the project comparison scope'
             assert 'Comparison fallback' not in received, 'Comparison unexpectedly fell back'
-        assert (project / 'smoke.md').read_text() == 'Use this file for testing.\n', 'Fixture did not correct the prose'
+        expected = 'We will use this, e.g. for testing.\n' if unresolved else 'Use this file for testing.\n'
+        trace = [json.loads(line) for line in trace_path.read_text().splitlines()]
+        delivery = assert_lifecycle(trace, requests, unresolved, result.stdout)
+        (evidence / 'delivery.json').write_text(json.dumps(delivery, indent=2))
+        version = subprocess.run(['codex', '--version'], env=env, capture_output=True, text=True, check=True, timeout=10).stdout.strip()
+        (evidence / 'case.json').write_text(json.dumps(dict(host='codex', client_version=version, options=vars(args) | {'output_dir': str(evidence)}), indent=2))
+        assert (project / 'smoke.md').read_text() == expected, 'Fixture did not correct the prose'
         print(f'Real Codex hook dispatch passed ({len(requests)} offline model requests).')
 
 
