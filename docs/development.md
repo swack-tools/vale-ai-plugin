@@ -22,11 +22,14 @@ docs/                 Documentation source and static assets
 
 The runtime uses only the Python standard library and the installed Vale
 executable. The documentation build uses the pinned dependency in
-`requirements-docs.txt`.
+`requirements-docs.txt`. Package validation and its tests use PyYAML from
+`requirements-dev.txt`. Installed hooks need neither dependency.
 
 ## Run the checks
 
 ```sh
+python3 -m pip install -r requirements-dev.txt
+python3 scripts/validate_plugin.py
 python3 -m unittest discover -s tests -v
 python3 scripts/check_docs.py
 python3 scripts/codex_smoke.py --plugin
@@ -166,7 +169,8 @@ Every pull request and push to `main` runs the following checks:
 | --- | --- |
 | Unit and integration matrix | Linux and macOS with Python 3.11 and 3.14 |
 | Required markup parsers | Docutils 0.23 and Asciidoctor 2.0.26 on every matrix job |
-| Native client matrix | Codex 0.158.0 and Claude Code 2.1.277 on Linux, each with both feedback scopes |
+| Native client matrix | Eight Linux/macOS cases using Codex 0.158.0 and Claude Code 2.1.277, with both feedback scopes per host |
+| Package validation | Both marketplace formats, package names and versions, hook entry points, skill metadata, resource containment, and missing files |
 | Documentation | Google rules at suggestion level for source files and generated HTML |
 
 The parser jobs set `VALE_REQUIRE_PARSERS=1`, so missing optional parsers fail
@@ -223,3 +227,114 @@ quality. Use the [paired evaluation](evaluation.html) for that separate task.
 Hosted native jobs invoke `check-prose` in full-file mode and
 `procedural-prose` in new-findings mode for both clients. Both modes still
 verify hook feedback and the correction pass.
+
+## Package validation
+
+Run `python3 scripts/validate_plugin.py` from a source checkout. It returns `0`
+when the repository package passes its checks and `1` with path-specific errors
+otherwise. You can pass another repository root as its positional argument.
+It reads files without executing hook commands.
+
+The validator treats Codex's local source object and Claude's relative source
+string separately. It checks both marketplaces, matching package names and
+versions, existing hook entry points, skill frontmatter and agent metadata,
+and local resource paths. It rejects escaping paths, symlinks, and recognized
+private files inside the distributable package. Removing a linked skill resource
+or changing only one host's version causes a validation failure.
+
+This validator checks the repository contract. It doesn't implement the complete
+upstream schema or scan for secrets. Unknown optional fields remain the native client's responsibility.
+Claude jobs also run its native validator. Codex jobs prove actual loading.
+The rules follow the bundled Codex ingestion reference and the official
+[Claude plugin reference](https://code.claude.com/docs/en/plugins-reference) and
+[marketplace reference](https://code.claude.com/docs/en/plugin-marketplaces).
+
+## Observed native coverage
+
+The native matrix runs each of these cases on Linux and macOS:
+
+| Installation | Feedback scope | Skill context |
+| --- | --- | --- |
+| Codex manual project hooks | Full-file | Hooks only |
+| Codex marketplace plugin | New findings | Procedural skill |
+| Claude user plugin | Full-file | Checking skill |
+| Claude project plugin | New findings | Procedural skill |
+
+Each case records actual Pre, Post, and Stop calls, one blocking Stop, and four
+requests to the local model fixture. The fixture first writes bad prose, then
+attempts one correction. A second case deliberately leaves the findings intact.
+Plugin cases also change the disposable package version and skill text, update
+it, and require the new text in model context. Codex refreshes a local package
+with `plugin add`. Claude uses marketplace and plugin update commands. These
+checks don't establish remote Git update behavior.
+
+Use these commands to test all four installation paths locally:
+
+```sh
+python3 scripts/codex_smoke.py --output-dir /tmp/vale-review-codex-manual
+python3 scripts/codex_smoke.py --plugin --output-dir /tmp/vale-review-codex-plugin
+python3 scripts/claude_smoke.py --scope user --output-dir /tmp/vale-review-claude-user
+python3 scripts/claude_smoke.py --scope project --output-dir /tmp/vale-review-claude-project
+```
+
+Every output directory must be new. Without `--output-dir`, each run allocates
+a unique directory under `.research/`. Add `--unresolved` to leave findings
+after correction. Add `--upgrade` for a local plugin update check. Codex requires
+`--plugin` with `--upgrade`. Use a fresh output directory for each case.
+
+The evidence includes client stdout and stderr, model requests, hook envelopes,
+`delivery.json`, and `case.json` with client version and options. Inspect
+requests separately from stdout. A message in one channel isn't evidence that
+it reached another. Evidence contains only disposable synthetic documents.
+
+Temporary homes isolate `HOME`, `CODEX_HOME`, `CLAUDE_CONFIG_DIR`, and the `XDG_CONFIG_HOME`
+and `XDG_CACHE_HOME` directories. An environment allowlist retains executable and parser
+lookup while dropping ambient credentials, proxies, and provider routing.
+Only the Claude loopback fixture receives an explicit fake key. Fixture servers
+bind to `127.0.0.1`, and client calls have time limits. Instrumentation wraps the
+real checker only in the disposable package to record event envelopes.
+
+CI pins client versions and verifies the top-level npm archive against a
+recorded `SHA-512` digest before installation. npm still resolves optional
+platform dependencies with its own integrity checks. This isn't a fully
+vendored dependency lock. Update the version and digest together after reviewing
+and running the native fixtures.
+
+## Feedback delivery
+
+The unresolved fixtures distinguish three channels:
+
+| Evidence | Codex 0.158.0 headless JSON | Claude Code 2.1.277 headless stream |
+| --- | --- | --- |
+| Post feedback in model requests | Observed | Observed |
+| Blocking Stop feedback in model requests | Observed | Observed |
+| Active-Stop `systemMessage` emitted by hook | Observed | Observed |
+| Final active-Stop message in model requests | Absent | Absent |
+| Final active-Stop message in stdout | Absent | Observed |
+
+The final message doesn't trigger another model request. Don't assume that the
+model can summarize it. Interactive UI delivery remains unverified. For a final
+list of unresolved findings, run an explicit `--check FILE` or `--all` audit.
+The one-correction-pass guard remains in place. A clean fixture after correction
+doesn't prove delivery of the unresolved case.
+
+## Concurrency and publication guards
+
+The shared performance suite uses barriers to start same-session writer
+processes together and verifies the union of touched files. Another concurrent
+Pre test verifies a single initial snapshot. A separate-session test verifies
+that an occupied session lock doesn't block an independent session. These tests
+reuse the runtime's locking implementation.
+
+Workflow tests evaluate the actual publication conditions for pull requests,
+main and other branch pushes, schedules, and manual events. Only a main push can
+upload the Pages artifact and deploy it. Deployment depends on tests, native
+fixtures, and the documentation build. PR jobs have read-only contents access
+and checkout credential persistence turned off. No `pull_request_target` job runs
+untrusted checkout code. The workflow doesn't configure scheduled checks.
+
+Local success and hosted success are separate evidence. Check the
+[workflow runs](https://github.com/swack-tools/vale-ai-plugin/actions/workflows/ci-pages.yml)
+for the revision you intend to use. Windows Subsystem for Linux (WSL) and interactive trust dialogs aren't
+part of the native matrix. Scripted model replies verify transport and dispatch,
+not editorial judgment.

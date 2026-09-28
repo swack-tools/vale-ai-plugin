@@ -235,3 +235,18 @@ Apply it to `PreToolUse`, `PostToolUse`, and `Stop`. Keep local package changes
 under your own version control. A marketplace update can replace them.
 Manual skill comparisons also read project scope. An explicit command option
 takes precedence. Manual comparisons always require a Git reference.
+
+## Tested installation coverage
+
+The compatibility matrix covers Codex 0.158.0 manual project hooks and
+marketplace plugins, plus Claude Code 2.1.277 user and project plugins on Linux
+and macOS. Fixtures use temporary homes and project paths containing spaces.
+Installer tests separately cover both hook-only hosts and installation scopes.
+reStructuredText and AsciiDoc tests require Docutils 0.23 and Asciidoctor 2.0.26 in CI.
+
+Local plugin update checks verify that changed skill content reaches a fresh
+client session. They don't prove remote Git updates or interactive trust dialogs.
+Windows Subsystem for Linux uses the supported Unix-compatible runtime but has no dedicated native CI observation.
+Native Windows remains unsupported. See the
+[development matrix](development.html#observed-native-coverage) for commands,
+evidence, version pins, and final-warning delivery limits.

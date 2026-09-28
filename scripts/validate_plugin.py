@@ -14,7 +14,11 @@ from urllib.parse import unquote, urlsplit
 import yaml
 
 NAME = re.compile(r'[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*\Z')
-VERSION = re.compile(r'(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?\Z')
+VERSION = re.compile(
+    r'(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)'
+    r'(?:-(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.'
+    r'(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*)?'
+    r'(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?\Z')
 
 
 def validate_repository(root: Path) -> list[str]:
@@ -119,10 +123,20 @@ def validate_repository(root: Path) -> list[str]:
                 for key in ('author', 'interface'):
                     if not isinstance(manifest.get(key), dict):
                         fail(label, f'{key} must be an object')
+                if isinstance(manifest.get('author'), dict):
+                    nonempty(manifest['author'], 'name', label + ' author')
                 interface = manifest.get('interface', {})
                 if isinstance(interface, dict):
                     for key in ('displayName', 'shortDescription', 'longDescription', 'developerName', 'category'):
                         nonempty(interface, key, label)
+                    prompt = 'defaultPrompt' if 'defaultPrompt' in interface else 'default_prompt'
+                    if prompt not in interface:
+                        fail(label, 'interface.defaultPrompt is required')
+                    else:
+                        nonempty(interface, prompt, label)
+                    capabilities = interface.get('capabilities')
+                    if not isinstance(capabilities, list) or any(not isinstance(c, str) or not c.strip() for c in capabilities):
+                        fail(label, 'interface.capabilities must be an array of strings')
                 if 'skills' in manifest:
                     path(package, manifest['skills'], package, label, directory=True)
             # This package uses standard directories. Validate explicit local overrides.
@@ -165,7 +179,10 @@ def validate_repository(root: Path) -> list[str]:
                         fail(hook_label, f'{event} requires command hooks')
                         continue
                     try:
-                        words = shlex.split(command.get('command', ''))
+                        raw = command.get('command')
+                        if not isinstance(raw, str):
+                            raise ValueError('command must be text')
+                        words = shlex.split(raw)
                     except (ValueError, TypeError):
                         words = []
                     scripts = [w.split('}/', 1)[1] for w in words if w.startswith(('${CLAUDE_PLUGIN_ROOT}/', '${CODEX_PLUGIN_ROOT}/'))]

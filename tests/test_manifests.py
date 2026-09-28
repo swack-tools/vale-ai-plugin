@@ -73,3 +73,25 @@ class ManifestTests(unittest.TestCase):
     def test_malformed_manifest_is_actionable(self):
         (self.root / '.agents/plugins/marketplace.json').write_text('[]')
         self.assertIn('.agents/plugins/marketplace.json', self.errors())
+
+    def test_malformed_hook_command_is_diagnostic(self):
+        self.change('plugins/vale/hooks/hooks.json', lambda d: d['hooks']['Stop'][0]['hooks'][0].update(command=42))
+        self.assertIn('hooks.json', self.errors())
+
+    def test_missing_codex_author_name_is_diagnostic(self):
+        self.change('plugins/vale/.codex-plugin/plugin.json', lambda d: d.update(author={}))
+        self.assertIn('author', self.errors())
+
+    def test_invalid_semver_prerelease_is_diagnostic(self):
+        for host in ('codex','claude'):
+            self.change(f'plugins/vale/.{host}-plugin/plugin.json', lambda d: d.update(version='1.0.0-01'))
+        self.assertIn('version', self.errors())
+
+    def test_codex_interface_requires_prompt_and_capabilities(self):
+        name = 'plugins/vale/.codex-plugin/plugin.json'
+        original = (self.root / name).read_text()
+        for field in ('defaultPrompt', 'capabilities'):
+            with self.subTest(field=field):
+                self.change(name, lambda d: d['interface'].pop(field))
+                self.assertIn(field, self.errors())
+                (self.root / name).write_text(original)
