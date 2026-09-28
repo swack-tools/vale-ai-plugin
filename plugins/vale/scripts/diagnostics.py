@@ -6,7 +6,8 @@ import shutil
 import subprocess
 import time
 
-from vale_runner import EXTENSIONS, empty_result
+from vale_runner import empty_result
+from policy import EXTENSIONS, load_policy
 
 
 def empty_diagnostics(root):
@@ -21,17 +22,28 @@ def empty_diagnostics(root):
     return report
 
 
-def inspect_environment(root):
+def inspect_environment(root, *, cli_overrides=None):
     report = empty_diagnostics(root)
+    try:
+        policy = load_policy(root, cli_overrides)
+        report['policy'] = asdict(policy)
+    except (OSError, ValueError) as exc:
+        report['overall_status'] = 'incomplete'
+        report['errors'].append(str(exc))
+        return report
     vale = report['executable']['path']
     for name in ('.codex/hooks.json', '.claude/settings.json'):
         if (root / name).is_file():
             report['installation']['project_files'].append(name)
-    for extension in sorted(EXTENSIONS):
-        parser = {'rst': 'rst2html', 'adoc': 'asciidoctor'}.get(extension[1:])
+    extensions = {ext[1:]: ext[1:] for ext in EXTENSIONS}
+    extensions.update(policy.formats)
+    for extension, format_name in sorted(extensions.items()):
+        parser = {'rst': 'rst2html', 'adoc': 'asciidoctor'}.get(format_name)
         found = shutil.which(parser) if parser else None
-        report['formats'][extension[1:]] = dict(status='missing_parser' if parser and not found else 'available',
+        report['formats'][extension] = dict(status='missing_parser' if parser and not found else 'available',
                                                 parser=parser, executable=found)
+    for extension, view in policy.views.items():
+        report['formats'][extension] = dict(status='configured_view', parser=None, executable=None, view=view)
     end = time.monotonic() + 20
     try:
         if not vale:
@@ -67,6 +79,9 @@ def render_diagnostics(report):
              f"Workspace: {report['workspace']}",
              'Running client activation: unknown; inspect the client hook settings.',
              report['coverage']['note']]
+    if 'policy' in report:
+        for key in ('schema_version', 'scope', 'include', 'exclude', 'profile'):
+            lines.append(f"Policy {key}: {report['policy'][key]} ({report['policy']['origins'][key]})")
     for ext, data in report['formats'].items():
         if data['status'] == 'missing_parser':
             lines.append(f".{ext}: missing {data['parser']}; install the optional parser and expose it on PATH.")

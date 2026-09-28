@@ -18,11 +18,12 @@ from deadline import Deadline, OutputLimitExceeded, run_process
 
 from lint_result import Issue, render_text
 import vale_runner
+import policy as selection_policy
 
 # Preserve helper names used by existing callers of the original single module.
 PACKAGE = vale_runner.PACKAGE
-EXTENSIONS = vale_runner.EXTENSIONS
-EXCLUDED = vale_runner.EXCLUDED
+EXTENSIONS = selection_policy.EXTENSIONS
+EXCLUDED = selection_policy.EXCLUDED
 MAX_FILES = vale_runner.MAX_FILES
 MAX_BYTES = vale_runner.MAX_BYTES
 eligible = vale_runner.eligible
@@ -51,9 +52,10 @@ def workspace(cwd, *, deadline=None):
         return cwd
 
 
-def snapshot(root, *, deadline=None):
+def snapshot(root, *, deadline=None, policy=None):
     deadline = deadline or Deadline(50)
     deadline.check()
+    policy = policy or selection_policy.load_policy(root)
     try:
         names = sorted(set(os.fsdecode(git(root, 'ls-files', '-z', '--cached', '--others', '--exclude-standard', deadline=deadline)).split('\0')) - {''})
     except OutputLimitExceeded:
@@ -63,14 +65,18 @@ def snapshot(root, *, deadline=None):
         names = []
         for directory, dirs, files in os.walk(root, followlinks=False):
             deadline.check()
-            dirs[:] = [d for d in dirs if d not in EXCLUDED and not (Path(directory) / d).is_symlink()]
-            names.extend(str((Path(directory) / f).relative_to(root)) for f in files if Path(f).suffix.lower() in EXTENSIONS)
+            dirs[:] = [d for d in dirs if d not in (selection_policy.HARD_EXCLUDED if policy.include else EXCLUDED) and not (Path(directory) / d).is_symlink()]
+            for filename in files:
+                deadline.check()
+                name = str((Path(directory) / filename).relative_to(root))
+                if policy.supports(name) and policy.selected(name):
+                    names.append(name)
             if len(names) > MAX_FILES:
                 raise RuntimeError('More than 20,000 prose files; narrow the workspace or exclude generated files.')
     result = {}
     for name in names:
         deadline.check()
-        if not eligible(root, name):
+        if not eligible(root, name, policy):
             continue
         try:
             stat = (root / name).stat()
@@ -82,7 +88,7 @@ def snapshot(root, *, deadline=None):
     return result
 
 
-def direct_paths(payload, root, cwd):
+def direct_paths(payload, root, cwd, policy=None):
     if payload.get('tool_name') not in {'apply_patch', 'Edit', 'Write'}:
         return set()
     inputs = payload.get('tool_input')
@@ -103,7 +109,7 @@ def direct_paths(payload, root, cwd):
             relative = str(path.absolute().relative_to(root))
         except ValueError:
             continue
-        if eligible(root, relative):
+        if eligible(root, relative, policy):
             selected.add(str(path.resolve().relative_to(root)))
     return selected
 
@@ -228,7 +234,7 @@ def feedback(event, result, active=False, *, root=None, session=None):
     return {'systemMessage': text}
 
 
-def run_hook(payload, *, deadline=None, scope="changed-files"):
+def run_hook(payload, *, deadline=None, scope=None, cli_overrides=None):
     deadline = deadline or Deadline(50)
     if not isinstance(payload, dict):
         raise ValueError('Hook input must be a JSON object.')
@@ -244,10 +250,12 @@ def run_hook(payload, *, deadline=None, scope="changed-files"):
     try:
         deadline.check()
         root = workspace(root.resolve(strict=True), deadline=deadline)
+        policy = selection_policy.load_policy(root, {**(cli_overrides or {}), **({'scope': scope} if scope is not None else {})})
+        scope = policy.scope
         with locked_state(root, session, deadline=deadline) as data:
             if event == 'PreToolUse' and data['files'] is not None:
                 return {}
-            current = snapshot(root, deadline=deadline)
+            current = snapshot(root, deadline=deadline, policy=policy)
             changed = ({name for name, signature in current.items() if data['files'].get(name) != signature}
                        if data['files'] is not None else set())
             if event == 'PreToolUse':
@@ -255,10 +263,10 @@ def run_hook(payload, *, deadline=None, scope="changed-files"):
                 if scope == 'new-findings':
                     import baseline
                     directory = baseline.session_directory(state_directory(root, deadline=deadline), session)
-                    baseline.capture(directory, root, current, deadline)
+                    baseline.capture(directory, root, current, deadline, wrapper_policy=policy)
                 return {}
             if event == 'PostToolUse':
-                changed |= direct_paths(payload, root, Path(cwd_value).resolve()) & current.keys()
+                changed |= direct_paths(payload, root, Path(cwd_value).resolve(), policy) & current.keys()
             touched = (set(data['touched']) | changed) & current.keys()
             pending = (set(data['pending']) | changed) & current.keys()
             selected = touched if event == 'Stop' else pending
@@ -269,7 +277,7 @@ def run_hook(payload, *, deadline=None, scope="changed-files"):
             if scope == 'new-findings':
                 import baseline
                 directory = baseline.session_directory(state_directory(root, deadline=deadline), session)
-            result = scoped_check(root, sorted(selected), deadline=deadline, scope=scope, directory=directory)
+            result = scoped_check(root, sorted(selected), deadline=deadline, scope=scope, directory=directory, policy=policy)
             data['pending'] = sorted((pending | selected) - set(result.submitted_files))
             if result.status in {'findings', 'incomplete'}:
                 return feedback(event, result, active, root=root, session=session)
@@ -283,17 +291,17 @@ def run_hook(payload, *, deadline=None, scope="changed-files"):
 
 
 
-def scoped_check(root, names, *, deadline, scope='changed-files', directory=None, revision=None):
+def scoped_check(root, names, *, deadline, scope='changed-files', directory=None, revision=None, policy=None):
     if scope == 'changed-files' or (not names and revision is None):
-        return run_check(root, names, deadline=deadline)
+        return run_check(root, names, deadline=deadline, **({"policy": policy} if policy is not None else {}))
     import baseline
     try:
-        policy = baseline.policy_identity(root, deadline)
+        identity = baseline.policy_identity(root, deadline, wrapper_policy=policy)
     except (OSError, ValueError, RuntimeError):
-        policy = None
+        identity = None
     documents = {}
-    result = run_check(root, names, deadline=deadline, documents=documents if policy is not None else None)
-    return baseline.compare(root, result, documents, policy, directory=directory, revision=revision, deadline=deadline)
+    result = run_check(root, names, deadline=deadline, documents=documents if identity is not None else None, policy=policy)
+    return baseline.compare(root, result, documents, identity, directory=directory, revision=revision, deadline=deadline, wrapper_policy=policy)
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -302,13 +310,20 @@ def main():
     mode.add_argument('--all', action='store_true', help='Check all eligible workspace files.')
     mode.add_argument('--doctor', action='store_true', help='Inspect the engine, configuration, and parser readiness.')
     parser.add_argument('--format', choices=('text', 'json'), default='text')
-    parser.add_argument('--scope', choices=('changed-files', 'new-findings'), default='changed-files')
+    parser.add_argument('--scope', choices=('changed-files', 'new-findings'))
     parser.add_argument('--base-ref', help='Git commit or ref for manual new-findings checks.')
+    for name in ('include', 'exclude'):
+        patterns = parser.add_mutually_exclusive_group()
+        patterns.add_argument('--' + name, action='append', help=f'Replace project {name} patterns; repeat for more patterns.')
+        patterns.add_argument('--clear-' + name, dest=name, action='store_const', const=[],
+                              help=f'Override the project {name} list with an empty list.')
+    parser.add_argument('--profile', choices=('auto', 'google'))
     args = parser.parse_args()
-    if args.base_ref is not None and (not args.check or args.scope != 'new-findings'):
+    overrides = {key: getattr(args, key) for key in ('scope', 'include', 'exclude', 'profile')}
+    if args.base_ref is not None and (not args.check or args.scope == 'changed-files'):
         parser.error('--base-ref requires --check and --scope new-findings.')
-    if args.scope == 'new-findings' and (args.all or args.doctor or (args.check and args.base_ref is None)):
-        parser.error('Manual new-findings requires --check FILE... --base-ref REV; --all and --doctor do not compare.')
+    if args.scope == 'new-findings' and (args.all or (args.check and args.base_ref is None)):
+        parser.error('Manual new-findings requires --check FILE... --base-ref REV; --all does not compare.')
     if args.check or args.all or args.doctor:
         root = Path.cwd()
         try:
@@ -335,7 +350,7 @@ def main():
             return 2
         if args.doctor:
             from diagnostics import inspect_environment, render_diagnostics
-            report = inspect_environment(root)
+            report = inspect_environment(root, cli_overrides=overrides)
             print(json.dumps(report) if args.format == 'json' else render_diagnostics(report))
             return 2 if report['overall_status'] == 'incomplete' else 0
         names = []
@@ -344,9 +359,15 @@ def main():
             names.append(str(path.relative_to(root)) if path.is_relative_to(root) else str(path))
         deadline = Deadline(50)
         try:
+            policy = selection_policy.load_policy(root, overrides)
+            scope = 'changed-files' if args.all else policy.scope
+            if args.base_ref and scope != 'new-findings':
+                raise ValueError('--base-ref requires --scope new-findings or the same project scope.')
+            if scope == 'new-findings' and args.base_ref is None:
+                raise ValueError('Manual new-findings requires --base-ref REV; use --all for a full audit.')
             if args.all:
-                names = sorted(snapshot(root, deadline=deadline))
-            result = scoped_check(root, names, deadline=deadline, scope=args.scope, revision=args.base_ref)
+                names = sorted(snapshot(root, deadline=deadline, policy=policy))
+            result = scoped_check(root, names, deadline=deadline, scope=scope, revision=args.base_ref, policy=policy)
         except (OSError, ValueError, RuntimeError, subprocess.TimeoutExpired) as exc:
             result = empty_result(root, names)
             result.errors.append(Issue('check_error', str(exc)))
@@ -354,7 +375,7 @@ def main():
         print(result.to_json() if args.format == 'json' else render_text(result))
         return result.exit_code
     try:
-        result = run_hook(json.load(sys.stdin), scope=args.scope)
+        result = run_hook(json.load(sys.stdin), cli_overrides=overrides)
     except (ValueError, OSError) as error:
         print(f'Vale: invalid hook input: {error}', file=sys.stderr)
         return 1

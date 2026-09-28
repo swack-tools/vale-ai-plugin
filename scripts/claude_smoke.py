@@ -5,9 +5,10 @@ import json
 import os
 from pathlib import Path
 import subprocess
-import tempfile
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+from smoke_support import temporary_workspace
 
 REPO = Path(__file__).resolve().parents[1]
 requests = []
@@ -56,13 +57,16 @@ def main():
     global project
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--scope', choices=('user', 'project'), default='user')
+    parser.add_argument('--feedback-scope', choices=('changed-files', 'new-findings'), default='changed-files')
     args = parser.parse_args()
     requests.clear()
-    with tempfile.TemporaryDirectory(prefix='vale-claude-smoke-') as tmp:
+    with temporary_workspace(prefix='vale-claude-smoke-') as tmp:
         base = Path(tmp).resolve()
         project = base / 'project'
         project.mkdir()
         subprocess.run(['git', 'init', '-q', str(project)], check=True)
+        (project / '.vale-plugin.toml').write_text(
+            f'scope = "{args.feedback_scope}"\ninclude = ["smoke.md"]\n')
         config = base / 'claude'
         config.mkdir()
         env = {k: v for k, v in os.environ.items() if not k.startswith(('ANTHROPIC_', 'CLAUDE_')) and k != 'CLAUDECODE'}
@@ -93,6 +97,10 @@ def main():
         assert requests, 'Claude did not call the local fixture'
         assert 'Check technical prose' in json.dumps(requests[0]), 'Claude did not expand the slash command'
         assert any('Google.Latin' in json.dumps(r) for r in requests[1:]), 'Claude did not receive hook feedback'
+        if args.feedback_scope == 'new-findings':
+            received = json.dumps(requests[1:])
+            assert 'new/actionable' in received, 'Client did not receive the project comparison scope'
+            assert 'Comparison fallback' not in received, 'Comparison unexpectedly fell back'
         assert (project / 'smoke.md').read_text() == 'Use this file for testing.\n', 'Stop hook did not trigger correction'
         print(f'Real Claude plugin, command, and hook dispatch passed ({len(requests)} offline requests).')
 

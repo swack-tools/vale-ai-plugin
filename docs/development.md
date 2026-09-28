@@ -156,3 +156,39 @@ editorial review of accuracy, accessibility, or complete Google style guidance.
 The build job also runs `python3 scripts/check_docs.py site/*.html` after
 rendering. This checks generated navigation, labels, and footer text alongside
 the guide content. Source and rendered checks both require zero findings.
+
+## Continuous integration coverage
+
+Every pull request and push to `main` runs the following checks:
+
+| Job | Coverage |
+| --- | --- |
+| Unit and integration matrix | Linux and macOS with Python 3.11 and 3.14 |
+| Required markup parsers | Docutils 0.23 and Asciidoctor 2.0.26 on every matrix job |
+| Native client matrix | Codex 0.158.0 and Claude Code 2.1.277 on Linux, each with both feedback scopes |
+| Documentation | Google rules at suggestion level for source files and generated HTML |
+
+The parser jobs set `VALE_REQUIRE_PARSERS=1`, so missing optional parsers fail
+CI instead of skipping their integration tests. A macOS filesystem limitation
+still skips the raw-byte filename case. The native jobs install pinned public
+clients and use temporary projects with local model fixtures. They verify
+marketplace discovery, skill availability, tool feedback, project policy, and
+the Stop correction pass without model credentials or paid model calls.
+
+Run the comparison fixtures locally with these commands:
+
+```sh
+python3 scripts/codex_smoke.py --plugin --feedback-scope new-findings
+python3 scripts/claude_smoke.py --scope project --feedback-scope new-findings
+```
+
+Use `--feedback-scope changed-files` for the other matrix mode. These fixtures
+exercise client integration. They don't evaluate editorial model judgment or
+interactive trust dialogs. CI retains unit-test logs and native request/output logs for seven
+days. The logs contain disposable fixture data. No project documents or real
+model credentials belong in them.
+
+Native fixture cleanup retries only transient nonempty-directory errors, for
+at most three seconds of retry delay. Other cleanup failures remain visible.
+All matrix jobs and the documentation build must pass before a push to `main`
+can deploy Pages. Pull requests never deploy.

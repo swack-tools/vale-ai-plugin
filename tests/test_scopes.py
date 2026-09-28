@@ -125,7 +125,7 @@ class ScopeTests(unittest.TestCase):
 
     def test_invalid_mode_combinations(self):
         for args in [('--all', '--scope', 'new-findings'), ('--check', 'guide.md', '--scope', 'new-findings'),
-                     ('--check', 'guide.md', '--base-ref', 'HEAD'), ('--doctor', '--scope', 'new-findings')]:
+                     ('--check', 'guide.md', '--base-ref', 'HEAD')]:
             with self.subTest(args=args):
                 self.assertEqual(self.cli(*args).returncode, 2)
 

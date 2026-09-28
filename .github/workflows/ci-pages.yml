@@ -10,11 +10,13 @@ permissions:
 
 jobs:
   test:
-    name: Test (${{ matrix.os }})
+    name: Test (${{ matrix.os }}, Python ${{ matrix.python }})
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
+        python: ["3.11", "3.14"]
+    timeout-minutes: 10
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -22,15 +24,77 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
-          python-version: '3.11'
+          python-version: ${{ matrix.python }}
       - name: Install verified Vale
         run: |
           python scripts/install_vale_ci.py "$RUNNER_TEMP/vale-bin"
           echo "$RUNNER_TEMP/vale-bin" >> "$GITHUB_PATH"
+      - name: Install required markup parsers
+        run: |
+          python -m pip install docutils==0.23
+          gem install asciidoctor --version 2.0.26 --no-document --install-dir "$RUNNER_TEMP/gems" --bindir "$RUNNER_TEMP/gem-bin"
+          echo "GEM_HOME=$RUNNER_TEMP/gems" >> "$GITHUB_ENV"
+          echo "$RUNNER_TEMP/gem-bin" >> "$GITHUB_PATH"
       - name: Test hooks and installers
-        run: python -m unittest discover -s tests -v
+        shell: bash
+        env:
+          VALE_REQUIRE_PARSERS: '1'
+        run: python -m unittest discover -s tests -v 2>&1 | tee test-results.log
+      - name: Retain test results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: tests-${{ matrix.os }}-python-${{ matrix.python }}
+          path: test-results.log
+          retention-days: 7
       - name: Check documentation style
         run: python scripts/check_docs.py
+  native:
+    name: Native ${{ matrix.host }} (${{ matrix.scope }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        host: [codex, claude]
+        scope: [changed-files, new-findings]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Install verified Vale
+        run: |
+          python scripts/install_vale_ci.py "$RUNNER_TEMP/vale-bin"
+          echo "$RUNNER_TEMP/vale-bin" >> "$GITHUB_PATH"
+      - name: Install pinned Codex client
+        if: matrix.host == 'codex'
+        run: npm install --global @openai/codex@0.158.0
+      - name: Install pinned Claude client
+        if: matrix.host == 'claude'
+        run: npm install --global @anthropic-ai/claude-code@2.1.277
+      - name: Exercise Codex marketplace and hooks
+        if: matrix.host == 'codex'
+        run: python scripts/codex_smoke.py --plugin --feedback-scope "${{ matrix.scope }}"
+      - name: Exercise Claude marketplace and hooks
+        if: matrix.host == 'claude'
+        run: python scripts/claude_smoke.py --scope project --feedback-scope "${{ matrix.scope }}"
+      - name: Retain native fixture evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: native-${{ matrix.host }}-${{ matrix.scope }}
+          path: |
+            .research/*-smoke.jsonl
+            .research/*-smoke.stderr
+            .research/*-smoke-requests.json
+          retention-days: 7
+
   build:
     name: Build documentation
     runs-on: ubuntu-latest
@@ -55,7 +119,7 @@ jobs:
           path: site
   deploy:
     name: Deploy GitHub Pages
-    needs: [test, build]
+    needs: [test, native, build]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     concurrency:

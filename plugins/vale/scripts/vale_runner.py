@@ -6,35 +6,35 @@ import subprocess
 
 from deadline import Deadline, DeadlineExceeded, run_process
 from lint_result import CheckResult, Coverage, Finding, Issue
+from policy import EffectivePolicy, load_policy
 
 PACKAGE = Path(__file__).resolve().parents[1]
-EXTENSIONS = set('.md .mdx .txt .rst .adoc .html .rs .py .sh .pl .js .jsx .ts .tsx .go .c .h .cpp .hpp .java .css'.split())
-EXCLUDED = {'.git', '.codex', '.claude', '.agents', '.venv', 'node_modules', 'target', 'dist', 'build', '.vale', 'vendor', '__pycache__'}
 MAX_FILES = 20000
 MAX_BYTES = 1024 * 1024
 MAX_DOCUMENT_BYTES = 16 * 1024 * 1024
 
 
-def path_issue(root, name):
+def path_issue(root, name, policy=None):
+    policy = policy or EffectivePolicy()
     path = root / name
     if path.is_symlink() or any(p.is_symlink() for p in path.parents):
         return Issue('unsupported_path', 'Symbolic links are not checked.', name)
     if not path.is_file() or not path.resolve().is_relative_to(root):
         return Issue('unsupported_path', 'File is missing, is not a regular file, or is outside the workspace.', name)
-    if set(Path(name).parts) & EXCLUDED:
-        return Issue('excluded_path', 'File is in an excluded directory.', name)
-    if path.suffix.lower() not in EXTENSIONS:
+    if not policy.selected(name):
+        return Issue('excluded_path', 'File is excluded by the wrapper policy.', name)
+    if not policy.supports(name):
         return Issue('unsupported_path', 'File extension is not supported.', name)
     return None
 
 
-def eligible(root, name):
+def eligible(root, name, policy=None):
+    policy = policy or EffectivePolicy()
     # Filter snapshot candidates before filesystem calls. Explicit operands use
     # path_issue directly so invalid requests stay distinct from policy skips.
-    path = Path(name)
-    if path.suffix.lower() not in EXTENSIONS or set(path.parts) & EXCLUDED:
+    if not policy.supports(name) or not policy.selected(name):
         return False
-    return path_issue(root, name) is None
+    return path_issue(root, name, policy) is None
 
 
 def configuration(root):
@@ -89,16 +89,21 @@ def decode_alert(alert, path):
                    alert['Severity'], alert['Message'], alert['Match'], link, suggestions, action)
 
 
-def run_check(root, names, *, deadline=None, documents=None):
+def run_check(root, names, *, deadline=None, documents=None, policy=None):
     deadline = deadline or Deadline(50)
     result = empty_result(root, names)
+    try:
+        policy = policy or load_policy(root)
+    except (OSError, ValueError) as exc:
+        result.errors.append(Issue("policy_error", str(exc)))
+        return result.finish()
     if not names:
         return result
     paths, aliases = [], []
     for name in sorted(set(names)):
         try:
             deadline.check()
-            problem = path_issue(root, name)
+            problem = path_issue(root, name, policy)
             if problem:
                 (result.skipped_files if problem.code == 'excluded_path' else result.errors).append(problem)
                 continue
@@ -126,14 +131,15 @@ def run_check(root, names, *, deadline=None, documents=None):
     return _execute(root, result, jobs, deadline, vale, captured=documents)
 
 
-def check_document(root, text, logical_path, *, deadline=None):
+def check_document(root, text, logical_path, *, deadline=None, policy=None):
     """Lint complete in-memory text with the same decoder and configuration."""
     deadline = deadline or Deadline(50)
+    policy = policy or load_policy(root)
     name = str(logical_path)
     result = empty_result(root, [name])
     path = root / name
     if (not path.is_absolute() or not path.is_relative_to(root) or '..' in path.parts or
-            path.suffix.lower() not in EXTENSIONS or set(Path(name).parts) & EXCLUDED or
+            not policy.supports(name) or not policy.selected(name) or
             path.is_symlink() or any(p.is_symlink() for p in path.parents)):
         result.errors.append(Issue('unsupported_path', 'Invalid logical document path.', name))
     elif len(text.encode('utf-8')) > MAX_BYTES:
