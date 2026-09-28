@@ -36,10 +36,10 @@ codex plugin add vale@vale
 ```
 
 Start a new chat, review and trust Vale in `/hooks`, then invoke `$vale:check-prose`
-or select it through `/skills`. For a dedicated slash command, clone this repo
-and run `python3 scripts/install_codex_command.py`; then use
-`/prompts:vale README.md`. This optional command uses Codex's deprecated custom
-prompt support. The shared skill is the preferred Codex interface.
+or select it through the `/skills` slash command. Codex 0.158.0 does not support
+custom `/prompts:vale` commands. A legacy prompt template and installer are
+included only for older clients that retain custom prompt support. See the
+installation guide for that compatibility path.
 
 [Installation guide](https://vale.swacktech.com/installation.html) ·
 [Commands, skills, and examples](https://vale.swacktech.com/usage.html) ·

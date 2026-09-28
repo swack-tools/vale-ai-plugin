@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Install the optional /prompts:vale compatibility command for Codex."""
+"""Install the legacy /prompts:vale compatibility command for Codex."""
 import argparse
 import os
 from pathlib import Path
@@ -28,7 +28,8 @@ def main():
             target.write_text(SOURCE.read_text())
         print(f'{"Removed" if args.uninstall else "Installed"}: {target}')
         if not args.uninstall:
-            print('Requires the Vale plugin. Start a new Codex chat and use /prompts:vale.')
+            print('Requires the Vale plugin and a legacy client with custom prompt support.')
+            print('Codex 0.158.0 does not support /prompts:vale. Use /skills or $vale:check-prose there.')
     except (OSError, ValueError) as error:
         print(error, file=sys.stderr)
         return 1
