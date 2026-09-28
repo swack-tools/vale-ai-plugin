@@ -205,7 +205,6 @@ class ScopeTests(unittest.TestCase):
         self.assertIn('Symbolic links', str(self.event('Stop')))
 
     def test_style_and_vocabulary_changes_invalidate_policy(self):
-        baseline = importlib.import_module('baseline')
         hook = importlib.import_module('prose_lint')
         runner = importlib.import_module('vale_runner')
         package = self.root / 'package'
