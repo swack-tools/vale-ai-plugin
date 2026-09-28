@@ -10,7 +10,7 @@ import sys
 import tempfile
 import time
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 SCRIPTS = Path(__file__).resolve().parents[1] / 'plugins/vale/scripts'
 sys.path.insert(0, str(SCRIPTS))
@@ -150,6 +150,35 @@ class PerformanceTests(unittest.TestCase):
             self.assertLess(time.monotonic() - start, 1.08)
             self.assertIn('could not complete', result['hookSpecificOutput']['additionalContext'])
         self.assertEqual(before, self.state.read_bytes())
+
+    def test_deadline_stops_operand_validation(self):
+        module = self.deadline_module()
+        deadline = Mock()
+        deadline.check.side_effect = module.DeadlineExceeded('budget expired')
+        result = hook.run_check(self.root, [f'f{i}.md' for i in range(20000)], deadline=deadline)
+        self.assertEqual(deadline.check.call_count, 1)
+        self.assertEqual(result.status, 'incomplete')
+        self.assertEqual([error.code for error in result.errors], ['timeout'])
+        self.assertEqual(result.submitted_files, [])
+
+    def test_batch_deadline_preserves_findings_and_pending_files(self):
+        module = self.deadline_module()
+        self.event('PreToolUse')
+        names = [f'f{i:03}.md' for i in range(101)]
+        for name in names:
+            (self.root / name).write_text('We will use this file.\n')
+        alert = dict(Check='House.Example', Line=1, Span=[1, 2], Severity='warning',
+                     Message='Use another word.', Match='We')
+        completed = subprocess.CompletedProcess([], 0, json.dumps({str(self.root / names[0]): [alert]}), '')
+        with patch('vale_runner.run_process', side_effect=[completed, module.DeadlineExceeded('budget expired'),
+                                                          AssertionError('started a batch after timeout')]) as runner:
+            response = self.event('PostToolUse')
+        self.assertEqual(runner.call_count, 2)
+        context = response['hookSpecificOutput']['additionalContext']
+        self.assertIn('House.Example', context)
+        self.assertIn('budget expired', context)
+        self.assertIn('could not complete', context)
+        self.assertEqual(json.loads(self.state.read_text())['pending'], names[50:])
 
     def test_deadline_covers_workspace_discovery(self):
         module = self.deadline_module()

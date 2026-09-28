@@ -4,7 +4,7 @@ from pathlib import Path
 import shutil
 import subprocess
 
-from deadline import Deadline, run_process
+from deadline import Deadline, DeadlineExceeded, run_process
 from lint_result import CheckResult, Coverage, Finding, Issue
 
 PACKAGE = Path(__file__).resolve().parents[1]
@@ -109,6 +109,9 @@ def run_check(root, names, *, deadline=None):
                 aliases.append((name, path))
             else:
                 paths.append((name, path))
+        except DeadlineExceeded as exc:
+            result.errors.append(Issue('timeout', str(exc)))
+            return result.finish()
         except OSError as exc:
             result.errors.append(Issue('file_error', str(exc), name))
     if not paths and not aliases:
@@ -143,6 +146,11 @@ def run_check(root, names, *, deadline=None):
                 raise RuntimeError(proc.stderr.strip() or f'Vale exited with status {proc.returncode}.')
             if not issues:
                 result.submitted_files.extend(name for name, path in batch)
+        except DeadlineExceeded as exc:
+            # Keep completed findings/submissions so orchestration can retry only
+            # unfinished files, without processing further batches after expiry.
+            result.errors.append(Issue('timeout', str(exc)))
+            return result.finish()
         except (OSError, ValueError, RuntimeError, subprocess.TimeoutExpired) as exc:
             for name, path in batch:
                 result.errors.append(Issue('engine_error', str(exc), name))
