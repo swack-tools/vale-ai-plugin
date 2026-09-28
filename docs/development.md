@@ -260,7 +260,7 @@ The native matrix runs each of these cases on Linux and macOS:
 | Claude user plugin | Full-file | Checking skill |
 | Claude project plugin | New findings | Procedural skill |
 
-Each case records actual Pre, Post, and Stop calls, one blocking Stop, and four
+Each case requires successful Pre, Post, and Stop calls, one blocking Stop, and four
 requests to the local model fixture. The fixture first writes bad prose, then
 attempts one correction. A second case deliberately leaves the findings intact.
 Plugin cases also change the disposable package version and skill text, update
@@ -313,6 +313,8 @@ The unresolved fixtures distinguish three channels:
 | Final active-Stop message in model requests | Absent | Absent |
 | Final active-Stop message in stdout | Absent | Observed |
 
+The unresolved checks enforce the model and stdout results in this table.
+A delivery change fails the check and requires a review of these claims.
 The final message doesn't trigger another model request. Don't assume that the
 model can summarize it. Interactive UI delivery remains unverified. For a final
 list of unresolved findings, run an explicit `--check FILE` or `--all` audit.

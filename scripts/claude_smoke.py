@@ -119,7 +119,7 @@ def main():
             assert 'Comparison fallback' not in received, 'Comparison unexpectedly fell back'
         expected = 'We will use this, e.g. for testing.\n' if unresolved else 'Use this file for testing.\n'
         trace = [json.loads(line) for line in trace_path.read_text().splitlines()]
-        delivery = assert_lifecycle(trace, requests, unresolved, result.stdout)
+        delivery = assert_lifecycle(trace, requests, unresolved, result.stdout, host='claude')
         (evidence / 'delivery.json').write_text(json.dumps(delivery, indent=2))
         version = subprocess.run(['claude', '--version'], env=env, capture_output=True, text=True, check=True, timeout=10).stdout.strip()
         (evidence / 'case.json').write_text(json.dumps(dict(host='claude', client_version=version, options=vars(args) | {'output_dir': str(evidence)}), indent=2))

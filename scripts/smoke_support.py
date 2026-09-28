@@ -93,9 +93,11 @@ sys.exit(result.returncode)
     return destination
 
 
-def assert_lifecycle(trace, requests, unresolved, stdout):
+def assert_lifecycle(trace, requests, unresolved, stdout, *, host="codex"):
     """Keep emitted hook envelopes separate from client/model delivery evidence."""
     import json
+    assert host in ('codex', 'claude'), 'Unknown native client'
+    assert all(type(record.get('exit_code')) is int and record['exit_code'] == 0 for record in trace), 'Native hook invocation failed or lacks an exit code'
     events = [record['input'].get('hook_event_name') for record in trace]
     assert 'PreToolUse' in events, 'Native client did not run PreToolUse'
     assert 'PostToolUse' in events, 'Native client did not run PostToolUse'
@@ -110,6 +112,8 @@ def assert_lifecycle(trace, requests, unresolved, stdout):
     marker = 'Vale already requested a correction pass'
     if unresolved:
         assert marker in stops[-1]['output'].get('systemMessage', ''), 'Unresolved active Stop did not emit its report'
+        assert marker not in json.dumps(requests), 'Active Stop unexpectedly reached model context; refresh the documented delivery contract'
+        assert (marker in stdout) == (host == 'claude'), 'Active Stop stdout delivery changed; refresh the documented delivery contract'
     return {'events': events, 'blocking_stops': 1, 'model_requests': len(requests),
             'unresolved': unresolved,
             'active_stop_envelope_emitted': marker in json.dumps(stops[-1]['output']),

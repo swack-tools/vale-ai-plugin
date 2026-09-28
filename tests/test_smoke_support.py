@@ -97,6 +97,8 @@ class SmokeIsolationTests(unittest.TestCase):
                  {'input': {'hook_event_name': 'Stop'}, 'output': {'decision': 'block', 'reason': 'Google.Latin'}},
                  {'input': {'hook_event_name': 'Stop', 'stop_hook_active': True}, 'output': {'systemMessage': 'Vale already requested a correction pass'}}]
         requests = [{}, {'text': 'Google.Latin'}, {'text': 'Google.Latin Stop: Google.Latin'}, {}]
+        for record in trace:
+            record['exit_code'] = 0
         result = helper(trace, requests, True, '')
         self.assertFalse(result['active_stop_model_visible'])
         self.assertFalse(result['active_stop_stdout_visible'])
@@ -108,6 +110,37 @@ class SmokeIsolationTests(unittest.TestCase):
 
         with self.assertRaises(AssertionError):
             helper(trace, [{}, {'text':'Google.Latin'}, {'text':'Google.Latin'}, {}], True, '')
+
+    def test_failed_hook_and_changed_delivery_cannot_pass(self):
+        from copy import deepcopy
+        from smoke_support import assert_lifecycle
+        marker = 'Vale already requested a correction pass'
+        trace = [
+            {'input': {'hook_event_name': 'PreToolUse'}, 'output': {}, 'exit_code': 0},
+            {'input': {'hook_event_name': 'PostToolUse'}, 'output': {}, 'exit_code': 0},
+            {'input': {'hook_event_name': 'Stop'}, 'output': {'decision': 'block'}, 'exit_code': 0},
+            {'input': {'hook_event_name': 'Stop', 'stop_hook_active': True},
+             'output': {'systemMessage': marker}, 'exit_code': 0},
+        ]
+        requests = [{}, {'text': 'Google.Latin'}, {'text': 'Google.Latin Google.Latin'}, {}]
+        for index in range(len(trace)):
+            broken = deepcopy(trace)
+            broken[index]['exit_code'] = 1
+            with self.subTest(event=index), self.assertRaises(AssertionError):
+                assert_lifecycle(broken, requests, True, '')
+        with self.subTest(channel='stdout'), self.assertRaises(AssertionError):
+            assert_lifecycle(trace, requests, True, marker)
+        assert_lifecycle(trace, requests, True, marker, host='claude')
+        with self.subTest(channel='claude stdout'), self.assertRaises(AssertionError):
+            assert_lifecycle(trace, requests, True, '', host='claude')
+        missing = deepcopy(trace)
+        del missing[0]['exit_code']
+        with self.subTest(exit_code='missing'), self.assertRaises(AssertionError):
+            assert_lifecycle(missing, requests, True, '')
+        changed = deepcopy(requests)
+        changed[-1]['text'] = marker
+        with self.subTest(channel='model'), self.assertRaises(AssertionError):
+            assert_lifecycle(trace, changed, True, '')
 
     def test_client_timeout_preserves_output_and_requests(self):
         import json
