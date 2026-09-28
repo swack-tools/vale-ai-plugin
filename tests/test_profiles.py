@@ -1,6 +1,7 @@
 """Named profiles exercised through actual Vale and installed entrypoints."""
 import json
 import os
+import shutil
 from pathlib import Path
 import subprocess
 import sys
@@ -89,6 +90,26 @@ class ProfileTests(unittest.TestCase):
         self.assertEqual(code, 0, result)
         self.assertEqual(result['comparison']['existing'], 3)
         self.assertFalse(result['comparison']['fallback_reason'])
+
+    def test_historical_profile_change_keeps_findings_actionable(self):
+        package = self.root / 'plugin'
+        shutil.copytree(ROOT / 'plugins/vale', package)
+        config = package / 'profiles/ste-inspired.ini'
+        current = config.read_text()
+        config.write_text(current.replace('MinAlertLevel = warning', 'MinAlertLevel = error'))
+        subprocess.run(['git', '-C', str(self.root), 'add', '.'], check=True)
+        subprocess.run(['git', '-C', str(self.root), '-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '-qm', 'prior profile'], check=True)
+        config.write_text(current)
+        code, result = self.cli('--profile', 'ste-inspired', '--scope', 'new-findings', '--base-ref', 'HEAD', '--check', 'guide.md', script=package / 'scripts/prose_lint.py')
+        self.assertEqual(code, 1, result)
+        self.assertTrue(result['comparison']['fallback_reason'], result)
+        self.assertEqual(len(result['comparison']['actionable_indexes']), 3)
+        subprocess.run(['git', '-C', str(self.root), 'rm', '--cached', '-q', 'plugin/profiles/ste-inspired.ini'], check=True)
+        subprocess.run(['git', '-C', str(self.root), '-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '-qm', 'untrack profile'], check=True)
+        code, result = self.cli('--profile', 'ste-inspired', '--scope', 'new-findings', '--base-ref', 'HEAD', '--check', 'guide.md', script=package / 'scripts/prose_lint.py')
+        self.assertEqual(code, 1, result)
+        self.assertIn('untracked', result['comparison']['fallback_reason'])
+        self.assertEqual(len(result['comparison']['actionable_indexes']), 3)
 
     def test_incomplete_check_retains_selected_profile(self):
         (self.root / '.vale-plugin.toml').write_text('scope = "new-findings"\n')

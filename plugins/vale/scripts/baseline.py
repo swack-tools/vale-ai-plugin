@@ -209,7 +209,7 @@ def git_reader(root, revision, deadline):
         reason = 'Wrapper policy differs from the base commit.'
     package = vale_runner.PACKAGE
     if package.is_relative_to(root):
-        tracked_policy = [str((package / item).relative_to(root)) for item in ('.vale.ini', 'styles')]
+        tracked_policy = [str((package / item).relative_to(root)) for item in ('.vale.ini', 'profiles', 'styles')]
         # Omit --exclude-standard: ignored installed policies also lack Git history.
         if git_output(root, ['ls-files', '--others', '-z', '--', *tracked_policy], deadline):
             reason = 'Bundled policy has untracked or ignored inputs; historical equality is unverified.'
