@@ -259,3 +259,17 @@ class EvaluationTests(unittest.TestCase):
                 trial['reviewed_output_sha256'] = hashlib.sha256(path.read_bytes()).hexdigest()
                 self.assertEqual(self.run_validator()[0], 1)
         path.write_bytes(original)
+
+    def test_output_symlink_loop_returns_incomplete_report(self):
+        path = self.root / self.trials[0]['output_file']
+        path.unlink()
+        path.symlink_to(path.name)
+        self.assertEqual(self.run_validator()[0], 2)
+
+    def test_results_root_symlink_loop_returns_incomplete_report(self):
+        loop = self.root.parent / 'loop'
+        loop.symlink_to('loop')
+        run = subprocess.run([sys.executable, str(SCRIPT), '--results', str(loop), '--format', 'json'], capture_output=True, text=True)
+        self.assertEqual(run.returncode, 2, run.stderr)
+        self.assertFalse(run.stderr)
+        self.assertEqual(json.loads(run.stdout)['status'], 'incomplete')

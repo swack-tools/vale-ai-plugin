@@ -33,10 +33,10 @@ def read_file(root, name):
             PurePosixPath(name).is_absolute() or any(p in ('', '.', '..') for p in name.split('/'))):
         raise ValueError('Evidence paths must be relative without dot or empty components.')
     path = root / name
-    if not path.resolve().is_relative_to(root.resolve()):
-        raise ValueError('Evidence path leaves its directory.')
     if any(part.is_symlink() for part in [path, *path.parents] if part != root and part.is_relative_to(root)):
         raise ValueError('Evidence paths must not contain symbolic links.')
+    if not path.resolve().is_relative_to(root.resolve()):
+        raise ValueError('Evidence path leaves its directory.')
     with os.fdopen(os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK), 'rb') as source:
         info = os.fstat(source.fileno())
         if not stat.S_ISREG(info.st_mode) or info.st_size > LIMIT:
@@ -192,11 +192,12 @@ def evaluate(directory):
                   note='A pass means complete reviewed evidence, not measured editorial improvement or certified compliance.')
     errors = report['errors']
     try:
+        directory = directory.resolve()
         cases = catalog()
         trials = read_json(directory, 'trials.json')
         if not isinstance(trials, list) or len(trials) > 12:
             raise ValueError('trials.json must contain at most 12 records for the six paired cases.')
-    except (OSError, ValueError, TypeError) as exc:
+    except (OSError, ValueError, TypeError, RuntimeError) as exc:
         errors.append(str(exc))
         return report
     grouped = {}
@@ -256,7 +257,7 @@ def main():
             return 2
         print('Created unrun evaluation template at ' + str(args.prepare))
         return 0
-    report = evaluate(args.results.resolve())
+    report = evaluate(args.results)
     if args.format == 'json':
         print(json.dumps(report, indent=2))
     else:
