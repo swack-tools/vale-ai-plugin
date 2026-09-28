@@ -3,6 +3,7 @@
 import argparse
 from datetime import datetime
 import hashlib
+from html import unescape
 import json
 import os
 import re
@@ -97,13 +98,22 @@ def nonempty(value):
     return isinstance(value, str) and bool(value.strip())
 
 
+def has_option_continuation(tail):
+    """Conservatively detect same-line options through common markup wrappers."""
+    raw = unescape(tail).replace('\\-', '-')
+    visible = re.sub(r'<[^<>]*>', '', raw).translate(str.maketrans('', '', '*_~`[]'))
+    option = r'(?<![A-Za-z0-9])--?[A-Za-z0-9_]'
+    return bool(re.search(option, raw) or re.search(option, visible))
+
+
 def literal_count(source, text, literal):
     """Preserve complete code units; do not count changed prefixes as literals."""
     if literal in source.splitlines():
         return text.splitlines().count(literal)
     code = '`' + literal + '`'
     if code in source:
-        return len(re.findall(r'(?<!`)' + re.escape(code) + r'(?!`|[ \t]*`?--?[\w])', text))
+        spans = re.finditer(r'(?<!`)' + re.escape(code) + r'(?!`)', text)
+        return sum(not has_option_continuation(text[match.end():].split('\n', 1)[0]) for match in spans)
     # Remaining labels are words, identifiers, phrases, or already quoted units.
     # Apostrophes belong to a word: "mustn't" does not preserve "must".
     left = r"(?<![\w'’])" if literal[0].isalnum() or literal[0] == '_' else ''

@@ -153,8 +153,10 @@ explanation in the notes. Any unreviewed dimension makes the overall verdict
 Protected-literal checks compare exact occurrence counts against the original
 input and flag missing or added occurrences. Labels inside inline code protect
 the complete code span. Labels that occupy a whole source line protect that
-line. An option immediately after an inline span also changes the protected
-command, including an option outside the closing backtick. Other word and
+line. An option later on the same line also changes the protected command,
+including options outside the closing backtick. This check recognizes common
+emphasis, link, HTML, and escaped-dash forms. It can conservatively flag an
+unrelated option mention on that line too. Other word and
 identifier labels use word boundaries, so an extended
 identifier or a changed command argument can't pass as an unchanged prefix.
 This conservative check also flags code-format changes that remove the

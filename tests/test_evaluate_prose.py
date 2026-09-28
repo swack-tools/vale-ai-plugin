@@ -246,3 +246,16 @@ class EvaluationTests(unittest.TestCase):
     def test_review_metadata_cannot_contain_unvalidated_nested_fields(self):
         self.trials[0]['reviewer']['extra'] = {'unvalidated': 'data'}
         self.assertEqual(self.run_validator()[0], 2)
+
+    def test_formatted_option_continuations_change_the_command(self):
+        trial = next(t for t in self.trials if t['case_id'] == 'installation' and t['arm'] == 'skill')
+        path = self.root / trial['output_file']
+        original = path.read_bytes()
+        for suffix in (' **--force**', ' [--force](https://example.com)', ' __--force__',
+                       ' *--force*', ' ~~--force~~', ' <b>--force</b>',
+                       ' &#45;&#45;force', r' \-\-force', ' with **--force**', ' -<b>-</b>force', ' --[force](https://example.com)'):
+            with self.subTest(suffix=suffix):
+                path.write_text(original.decode().replace('`tool install --version 2.0`', '`tool install --version 2.0`' + suffix))
+                trial['reviewed_output_sha256'] = hashlib.sha256(path.read_bytes()).hexdigest()
+                self.assertEqual(self.run_validator()[0], 1)
+        path.write_bytes(original)
