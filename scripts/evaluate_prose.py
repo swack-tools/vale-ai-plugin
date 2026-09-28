@@ -161,6 +161,7 @@ def evaluate(directory):
         errors.append(str(exc))
         return report
     grouped = {}
+    pilot_settings = None
     unique = {key: set() for key in ('session_id', 'home', 'workspace', 'output_file')}
     for index, trial in enumerate(trials):
         try:
@@ -171,6 +172,10 @@ def evaluate(directory):
                 raise ValueError('Duplicate case/arm.')
             grouped[key] = trial
             result = inspect_trial(directory, trial, cases[trial['case_id']])
+            observed_settings = json.dumps({k: trial[k] for k in ('host', 'client_version', 'model', 'settings')}, sort_keys=True)
+            if pilot_settings is not None and observed_settings != pilot_settings:
+                errors.append('One pilot must use the same host, client, model, and settings for all six pairs.')
+            pilot_settings = observed_settings
             for field, seen in unique.items():
                 value = trial[field]
                 if value in seen:
@@ -187,7 +192,7 @@ def evaluate(directory):
             errors.append(f'{case_id}: missing baseline or skill arm.')
             continue
         mismatches = [field for field in ('host', 'client_version', 'model', 'settings', 'prompt_sha256')
-                      if baseline.get(field) != skill.get(field)]
+                      if json.dumps(baseline.get(field), sort_keys=True) != json.dumps(skill.get(field), sort_keys=True)]
         if mismatches:
             errors.append(f'{case_id}: mismatched pair metadata: ' + ', '.join(mismatches))
         report['pairs'].append(dict(case_id=case_id, metadata_match=not mismatches))

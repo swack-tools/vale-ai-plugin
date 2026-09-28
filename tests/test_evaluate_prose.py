@@ -192,3 +192,13 @@ class EvaluationTests(unittest.TestCase):
         self.assertIn('Duplicate JSON key', json.loads(run.stdout)['errors'][0])
         (self.root / self.trials[0]['output_file']).write_bytes(b'x' * (1024 * 1024 + 1))
         self.assertEqual(self.run_validator()[0], 2)
+
+    def test_one_pilot_cannot_mix_models_across_pairs(self):
+        self.trials[0]['model'] = self.trials[1]['model'] = 'another-model'
+        self.assertEqual(self.run_validator()[0], 2)
+
+    def test_pair_settings_preserve_json_types(self):
+        for trial in self.trials:
+            trial['settings'] = {'reasoning_effort': 'medium', 'sampling': False}
+        self.trials[1]['settings']['sampling'] = 0
+        self.assertEqual(self.run_validator()[0], 2)

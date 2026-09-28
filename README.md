@@ -106,6 +106,14 @@ GitHub Actions checks pull requests and deploys the documentation only on pushes
 to `main`, including pull request merges. See the [license](LICENSE). Bundled Google rules
 retain their upstream license.
 
+## Writing evaluation
+
+The source checkout includes twelve labeled prose fixtures and an offline
+validator for paired writing trials. It checks protected literals and requires
+explicit semantic reviews. The real-model pilot remains unrun. See the
+[writing evaluation guide](https://vale.swacktech.com/evaluation.html) for
+reproducible inputs, review criteria, and evidence limits.
+
 ## Diagnostics
 
 Run `python3 plugins/vale/scripts/prose_lint.py --doctor` to inspect the engine,
