@@ -28,8 +28,8 @@ codex --version
 ## Get the package
 
 ```sh
-git clone https://github.com/swack-tools/vite-ai-plugin.git
-cd vite-ai-plugin
+git clone https://github.com/swack-tools/vale-ai-plugin.git
+cd vale-ai-plugin
 ```
 
 Review the scripts before installing hooks. Installation needs no API key,

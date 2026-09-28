@@ -10,8 +10,8 @@ Requires Python 3.11+, Vale 3.23+, and Codex with lifecycle hooks. Supports macO
 Linux, and WSL. Tested with Codex command-line tool 0.158.0 and Vale 3.23.0.
 
 ```sh
-git clone https://github.com/swack-tools/vite-ai-plugin.git
-cd vite-ai-plugin
+git clone https://github.com/swack-tools/vale-ai-plugin.git
+cd vale-ai-plugin
 
 # Choose one scope.
 python3 scripts/install.py --project /path/to/project
@@ -27,7 +27,7 @@ To remove Vale, repeat the install command with `--uninstall`.
 
 The plugin package is in `plugins/vale`. A central plugin marketplace is optional.
 
-Read the [documentation](https://vite.swacktech.com) for setup, configuration,
+Read the [documentation](https://vale.swacktech.com) for setup, configuration,
 troubleshooting, and contribution instructions.
 
 ## Behavior

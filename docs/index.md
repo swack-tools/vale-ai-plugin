@@ -4,7 +4,7 @@ Vale brings Google documentation style checks into Codex. Write your docs,
 change a comment, or run a tool that edits a file. Vale checks the changed prose
 and returns findings while Codex still has the context to fix them.
 
-[Install Vale](installation.html) · [Browse the source](https://github.com/swack-tools/vite-ai-plugin)
+[Install Vale](installation.html) · [Browse the source](https://github.com/swack-tools/vale-ai-plugin)
 
 ## Three steps, one editing loop
 
