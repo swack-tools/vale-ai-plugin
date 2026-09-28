@@ -202,3 +202,24 @@ class EvaluationTests(unittest.TestCase):
             trial['settings'] = {'reasoning_effort': 'medium', 'sampling': False}
         self.trials[1]['settings']['sampling'] = 0
         self.assertEqual(self.run_validator()[0], 2)
+
+    def test_command_prefixes_and_appended_arguments_do_not_preserve_literals(self):
+        changes = [
+            ('installation', 'tool install --version 2.0', 'tool install --version 2.0.1'),
+            ('installation', 'tool install --version 2.0', 'tool install --version 2.0 --force'),
+            ('installation', "printf 'We will retry, e.g. later.'", "printf 'We will retry, e.g. later.' --bad"),
+            ('runbooks', 'restart --grace 30', 'restart --grace 300'),
+            ('api-reference', 'GET /v1/items?limit=10', 'GET /v1/items?limit=100'),
+            ('source-comments', 'None', 'NoneType'),
+            ('runbooks', 'must', "mustn't"),
+        ]
+        for case, old, new in changes:
+            with self.subTest(case=case, replacement=new):
+                trial = next(t for t in self.trials if t['case_id'] == case and t['arm'] == 'skill')
+                path = self.root / trial['output_file']
+                original = path.read_bytes()
+                path.write_text(original.decode().replace(old, new))
+                trial['reviewed_output_sha256'] = hashlib.sha256(path.read_bytes()).hexdigest()
+                self.assertEqual(self.run_validator()[0], 1)
+                path.write_bytes(original)
+                trial['reviewed_output_sha256'] = hashlib.sha256(original).hexdigest()

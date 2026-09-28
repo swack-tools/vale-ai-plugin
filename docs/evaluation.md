@@ -149,7 +149,14 @@ explanation in the notes. Any unreviewed dimension makes the overall verdict
 `unreviewed`. Otherwise any failure makes it `fail`.
 
 Protected-literal checks compare exact occurrence counts against the original
-input and flag missing or added occurrences. They can detect a changed command even
+input and flag missing or added occurrences. Labels inside inline code protect
+the complete code span. Labels that occupy a whole source line protect that
+line. Other word and identifier labels use word boundaries, so an extended
+identifier or a changed command argument can't pass as an unchanged prefix.
+This conservative check also flags code-format changes that remove the
+original delimiters or line layout. Keep that formatting intact during a trial.
+
+These checks can detect a changed command even
 when a reviewer marks the prose as a pass. Literal presence doesn't prove
 correct meaning: an output could keep a command in the wrong context. The
 semantic review remains necessary.

@@ -5,6 +5,7 @@ from datetime import datetime
 import hashlib
 import json
 import os
+import re
 from pathlib import Path, PurePosixPath
 import stat
 import sys
@@ -93,6 +94,20 @@ def nonempty(value):
     return isinstance(value, str) and bool(value.strip())
 
 
+def literal_count(source, text, literal):
+    """Preserve complete code units; do not count changed prefixes as literals."""
+    if literal in source.splitlines():
+        return text.splitlines().count(literal)
+    code = '`' + literal + '`'
+    if code in source:
+        return len(re.findall(r'(?<!`)' + re.escape(code) + r'(?!`)', text))
+    # Remaining labels are words, identifiers, phrases, or already quoted units.
+    # Apostrophes belong to a word: "mustn't" does not preserve "must".
+    left = r"(?<![\w'’])" if literal[0].isalnum() or literal[0] == '_' else ''
+    right = r"(?![\w'’])" if literal[-1].isalnum() or literal[-1] == '_' else ''
+    return len(re.findall(left + re.escape(literal) + right, text))
+
+
 def inspect_trial(directory, trial, case):
     if set(trial) != TRIAL_FIELDS:
         raise ValueError('Trial fields differ from the prepared schema: ' + ', '.join(sorted(set(trial) ^ TRIAL_FIELDS)))
@@ -139,8 +154,14 @@ def inspect_trial(directory, trial, case):
                 not nonempty(reviewer.get('id')) or not nonempty(trial.get('notes'))):
             raise ValueError('Reviewed evidence needs an identified human/agent and review notes.')
     source = read_file(ROOT, case['input_file']).decode('utf-8')
-    mismatches = [dict(literal=literal, expected=source.count(literal), actual=output.count(literal))
-                  for literal in case['protected_literals'] if output.count(literal) != source.count(literal)]
+    mismatches = []
+    for literal in case['protected_literals']:
+        expected = literal_count(source, source, literal)
+        actual = literal_count(source, output, literal)
+        if not expected:
+            raise ValueError('Protected literal has no labeled occurrence in the input.')
+        if actual != expected:
+            mismatches.append(dict(literal=literal, expected=expected, actual=actual))
     return dict(case_id=trial['case_id'], arm=trial['arm'], literal_status='fail' if mismatches else 'pass',
                 literal_mismatches=mismatches, semantic_verdict=verdict, reviewer=reviewer,
                 review_checks=checks, notes=trial.get('notes'), output_sha256=digest(output.encode('utf-8')),
