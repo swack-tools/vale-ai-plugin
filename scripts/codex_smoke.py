@@ -5,9 +5,10 @@ import json
 import os
 from pathlib import Path
 import subprocess
-import tempfile
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+from smoke_support import temporary_workspace
 
 REPO = Path(__file__).resolve().parents[1]
 requests = []
@@ -55,14 +56,17 @@ class Fixture(BaseHTTPRequestHandler):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--plugin', action='store_true', help='Install the repository marketplace instead of project hooks.')
+    parser.add_argument('--feedback-scope', choices=('changed-files', 'new-findings'), default='changed-files')
     args = parser.parse_args()
     requests.clear()
-    with tempfile.TemporaryDirectory(prefix='vale-codex-smoke-') as tmp:
+    with temporary_workspace(prefix='vale-codex-smoke-') as tmp:
         base = Path(tmp).resolve()
         project = base / 'project'
         home = base / 'codex'
         project.mkdir(); home.mkdir()
         subprocess.run(['git', 'init', '-q', str(project)], check=True)
+        (project / '.vale-plugin.toml').write_text(
+            f'scope = "{args.feedback_scope}"\ninclude = ["smoke.md"]\n')
         env = dict(os.environ, CODEX_HOME=str(home))
         if not args.plugin:
             subprocess.run(['python3', str(REPO / 'scripts/install.py'), '--project', str(project)], check=True, capture_output=True)
@@ -107,6 +111,10 @@ trust_level = "trusted"
             assert 'vale:check-prose' in json.dumps(requests[0]), 'Codex did not discover the checking skill'
             assert 'vale:google-prose' in json.dumps(requests[0]), 'Codex did not discover the writing skill'
         assert any('Google.Latin' in json.dumps(r) for r in requests[1:]), 'Codex did not receive Vale feedback'
+        if args.feedback_scope == 'new-findings':
+            received = json.dumps(requests[1:])
+            assert 'new/actionable' in received, 'Client did not receive the project comparison scope'
+            assert 'Comparison fallback' not in received, 'Comparison unexpectedly fell back'
         assert (project / 'smoke.md').read_text() == 'Use this file for testing.\n', 'Fixture did not correct the prose'
         print(f'Real Codex hook dispatch passed ({len(requests)} offline model requests).')
 

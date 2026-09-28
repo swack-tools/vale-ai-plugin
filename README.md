@@ -97,8 +97,9 @@ python3 scripts/codex_smoke.py --plugin
 python3 scripts/claude_smoke.py
 ```
 
-The smoke tests use the real clients with local model fixtures and temporary
-configuration. The fixtures need no model account or API key. See the
+CI tests Linux and macOS on Python 3.11 and 3.14, requires both optional markup
+parsers, and runs both clients with both feedback scopes. The smoke tests use
+the real clients with local model fixtures and temporary configuration. The fixtures need no model account or API key. See the
 [development guide](https://vale.swacktech.com/development.html) for details.
 
 GitHub Actions checks pull requests and deploys the documentation only on pushes
