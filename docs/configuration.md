@@ -89,3 +89,150 @@ BasedOnStyles =
 
 Review [Vale configuration](https://vale.sh/docs/vale-ini) for pattern precedence
 and more detailed syntax settings.
+
+## Project selection policy
+
+Create `.vale-plugin.toml` at the workspace root to share wrapper settings across
+Claude Code and Codex. Both project and user installations read this file.
+The wrapper doesn't merge per-user policy files.
+
+```toml
+schema_version = 1
+scope = "changed-files"
+include = []
+exclude = []
+profile = "auto"
+```
+
+These are the defaults. Omit any setting to keep its default. Explicit command
+options take precedence over project settings, which take precedence over
+bundled defaults. Unknown keys, invalid types, and unsupported values produce
+an incomplete check. The policy file must be a regular file of at most 64 KiB.
+
+| Setting | Effect |
+| --- | --- |
+| `schema_version` | Must be the integer `1`. |
+| `scope` | `changed-files` checks selected files in full. `new-findings` enables conservative comparison. |
+| `include` | An empty list preserves default selection. A nonempty list replaces it. |
+| `exclude` | Removes matching paths after inclusion. |
+| `profile` | `auto` uses root `.vale.ini` when present, otherwise bundled Google. `google` requires the bundled configuration. |
+
+Selecting `google` while a root `.vale.ini` exists produces a conflict. Use
+`auto` to keep the project configuration, or remove that configuration when
+switching to bundled rules. The wrapper never merges the two configurations.
+
+Patterns use Python's `fnmatchcase` on paths relative to the root, with `/` as
+the separator. Matching is case-sensitive. `*` can cross `/`, so `docs/*.md`
+also matches `docs/api/guide.md`. Patterns don't expand in a shell or use Git's
+ignore syntax. Quote patterns on the command line. Each list accepts up to
+64 patterns of at most 512 characters each. Absolute paths, backslashes, and
+`..` traversal components are invalid.
+
+For example, select only documentation and exclude archived guides:
+
+```toml
+include = ["README.md", "docs/*.md"]
+exclude = ["docs/archive/*"]
+```
+
+The entire `.git`, `.codex`, `.claude`, and `.agents` directory trees remain
+excluded. Includes can't enable symlinks or paths outside the workspace.
+A nonempty include list can select files under `.vale`, `.venv`, `node_modules`,
+`target`, `dist`, `build`, `vendor`, and `__pycache__`. File size and execution
+limits still apply. Automatic scans omit untracked Git-ignored files.
+An explicit `--check` can name an ignored file, subject to the wrapper policy.
+The wrapper reports policy-excluded operands as skipped.
+
+Use `--include`, `--exclude`, `--profile`, or `--scope` for a command-specific
+override. Repeat list options to supply multiple patterns. Each supplied list
+replaces the corresponding project list. It doesn't append to it.
+
+```sh
+python3 plugins/vale/scripts/prose_lint.py --all \
+  --include 'README.md' --include 'docs/*.md' --exclude 'docs/archive/*'
+python3 plugins/vale/scripts/prose_lint.py --doctor --format json
+```
+
+Doctor reports effective values and an origin of `default`, `project`, or `cli`
+for each setting. It also lists declared format aliases and parser readiness.
+
+## Reviewed vocabulary
+
+Use [Vale vocabularies](https://vale.sh/docs/keys/vocab) to maintain reviewed
+terminology. Vocabulary files contain one regular expression per line. Keep
+entries narrow and review changes as policy changes. The plugin doesn't learn
+terms from agent output.
+
+The integration tests verify this recipe with Vale 3.23.0. Start with the project-managed Google
+package preceding configuration, run `vale sync`, and create these files:
+
+```text
+.vale/styles/config/vocabularies/Project/accept.txt
+.vale/styles/config/vocabularies/Project/reject.txt
+```
+
+Put `OxiDex` in `accept.txt` and `Oxidexx` in `reject.txt`. Use this root
+`.vale.ini`:
+
+```ini
+StylesPath = .vale/styles
+MinAlertLevel = suggestion
+Packages = Google
+Vocab = Project
+
+[*.md]
+BasedOnStyles = Vale, Google
+Vale.Spelling = YES
+```
+
+Commit the vocabulary files and configuration. If your ignore rules exclude `.vale`, adjust
+your ignore rules to retain the reviewed vocabulary while excluding downloaded
+Google rules. Don't store the vocabulary inside a generated package directory.
+
+| Input | Verified result |
+| --- | --- |
+| `Use OxiDex.` | No terminology or spelling finding. |
+| `Use Oxidex.` | `Vale.Terms` requests the accepted casing. |
+| `Use Oxidexx.` | `Vale.Avoid` rejects the term. Spelling can also flag it. |
+| `Use OxiDex, e.g. for testing.` | `Google.Latin` still reports the abbreviation. |
+
+Accepted entries also become exceptions in other styles, so avoid broad
+patterns. The bundled configuration disables `Vale.Spelling`. Enabling a
+vocabulary doesn't imply that Vale runs spelling checks: the recipe explicitly
+sets `Vale.Spelling = YES`. With spelling turned off, rejected terms still use
+`Vale.Avoid`. Reviewed vocabulary doesn't establish factual accuracy.
+
+Project configurations cause new-findings comparison to fall back
+to full-file feedback because their dependencies aren't verified. Vocabulary
+changes therefore can't silently suppress findings. Wrapper policy changes
+also invalidate session comparison. Git comparisons require matching policy
+bytes at the base revision.
+
+## Additional filename extensions
+
+An include pattern alone doesn't enable an unsupported extension. Declare a
+Vale format mapping and matching rule section as well. For example, Markdown
+stored as `.prose` can use this project configuration:
+
+```ini
+StylesPath = .vale/styles
+MinAlertLevel = warning
+
+[formats]
+prose = md
+MD = md
+
+[*.{prose,MD}]
+BasedOnStyles = Google
+```
+
+```toml
+include = ["*.prose", "*.MD"]
+```
+
+The `.prose` fixture reports prose findings at their original locations and
+skips fenced code. `MD = md` provides the same parser behavior for uppercase
+Markdown names. Add an alias for each additional case spelling you use.
+a filename glob alone doesn't select the correct parser. The wrapper accepts
+aliases only to its supported formats and retains project coverage as unknown.
+It doesn't modify project `.vale.ini` files.
