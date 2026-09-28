@@ -4,7 +4,7 @@ from pathlib import Path
 import shutil
 import subprocess
 
-from deadline import Deadline, DeadlineExceeded, run_process
+from deadline import Deadline, run_process
 from lint_result import CheckResult, Coverage, Finding, Issue
 
 PACKAGE = Path(__file__).resolve().parents[1]

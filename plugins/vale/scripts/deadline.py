@@ -90,6 +90,7 @@ def run_process(args, *, cwd=None, input=None, deadline=None, timeout=20, max_ou
         try:
             os.killpg(proc.pid, signal.SIGKILL)
         except ProcessLookupError:
+            # The process group has already exited; no descendants need killing.
             pass
         for stream in (proc.stdin, proc.stdout, proc.stderr):
             stream.close()

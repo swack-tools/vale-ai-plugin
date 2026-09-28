@@ -9,17 +9,18 @@ import hashlib
 import json
 import os
 from pathlib import Path
-import shutil
 import subprocess
 import sys
 import tempfile
 import time
 
-from deadline import Deadline, DeadlineExceeded, run_process
+from deadline import Deadline, run_process
+from deadline import DeadlineExceeded as DeadlineExceeded
 
 from lint_result import Issue, render_text
-from vale_runner import (PACKAGE, EXTENSIONS, EXCLUDED, MAX_FILES, MAX_BYTES,
-                         eligible, configuration, empty_result, run_check)
+from vale_runner import EXTENSIONS, EXCLUDED, MAX_FILES, eligible, empty_result, run_check
+# Preserve helper imports used by existing callers of the original single module.
+from vale_runner import PACKAGE as PACKAGE, MAX_BYTES as MAX_BYTES, configuration as configuration
 
 EVENTS = {'PreToolUse', 'PostToolUse', 'Stop'}
 

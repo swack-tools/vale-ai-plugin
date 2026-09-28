@@ -3,7 +3,6 @@ import fcntl
 import hashlib
 import importlib
 import json
-import os
 from pathlib import Path
 import subprocess
 import sys
@@ -50,7 +49,6 @@ class PerformanceTests(unittest.TestCase):
                          (self.state.stat().st_ino, self.state.stat().st_mtime_ns))
 
     def test_partial_batch_remains_pending(self):
-        module = self.deadline_module()
         self.event('PreToolUse')
         self.file.write_text('We will use this, e.g. for testing.\n')
         from vale_runner import empty_result
