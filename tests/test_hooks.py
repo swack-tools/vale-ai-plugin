@@ -67,6 +67,30 @@ class HookTests(unittest.TestCase):
         post = self.event('PostToolUse', name='apply_patch', inputs={'command': '*** Begin Patch\n*** Update File: docs with spaces.md\n*** End Patch'})
         self.assertIn('Google.Latin', post['hookSpecificOutput']['additionalContext'])
 
+    def test_claude_write_edit_fallback(self):
+        self.file.write_text(BAD)
+        for name in ('Write', 'Edit'):
+            post = self.event('PostToolUse', name=name, inputs={'file_path': str(self.file)}, session_id=name)
+            self.assertIn('Google.Latin', post['hookSpecificOutput']['additionalContext'])
+
+    def test_agent_configuration_files_are_excluded(self):
+        self.event('PreToolUse')
+        for folder in ('.claude', '.agents'):
+            directory = self.root / folder
+            directory.mkdir()
+            (directory / 'instructions.md').write_text(BAD)
+        self.assertEqual(self.event('PostToolUse'), {})
+
+    def test_shared_plugin_command_from_path_with_spaces(self):
+        plugin = self.root / 'plugin cache/vale'
+        shutil.copytree(ROOT / 'plugins/vale', plugin)
+        command = json.loads((plugin / 'hooks/hooks.json').read_text())['hooks']['PreToolUse'][0]['hooks'][0]['command']
+        payload = dict(hook_event_name='PreToolUse', session_id='plugin', cwd=str(self.root))
+        run = subprocess.run(command, shell=True, env=dict(os.environ, CLAUDE_PLUGIN_ROOT=str(plugin)),
+                             input=json.dumps(payload), capture_output=True, text=True)
+        self.assertEqual(run.returncode, 0, run.stderr)
+        self.assertEqual(json.loads(run.stdout), {})
+
     def test_new_file_and_missing_post_event_caught_at_stop(self):
         self.event('PreToolUse')
         (self.root / 'new.md').write_text(BAD)

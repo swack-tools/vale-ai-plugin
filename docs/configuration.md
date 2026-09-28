@@ -16,7 +16,7 @@ preserves a project's existing policy, including any rules turned off. A custom
 configuration can weaken or remove Google checks; include Google explicitly if
 that is your project's requirement.
 
-For a project installation, this configuration uses the installed rules:
+For a manual Codex project installation, this configuration uses the installed rules:
 
 ```ini
 StylesPath = .codex/vale/styles
@@ -27,7 +27,8 @@ BasedOnStyles = Vale, Google
 Vale.Spelling = NO
 ```
 
-For a user installation with project-managed rules:
+For a manual Claude Code installation, use `.claude/vale/styles` instead.
+For marketplace or user installations, use project-managed rules:
 
 ```ini
 StylesPath = .vale/styles

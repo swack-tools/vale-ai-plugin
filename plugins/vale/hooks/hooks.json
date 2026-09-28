@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"${PLUGIN_ROOT}/scripts/prose_lint.py\"",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/prose_lint.py\"",
             "timeout": 60,
             "statusMessage": "Checking documentation style"
           }
@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"${PLUGIN_ROOT}/scripts/prose_lint.py\"",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/prose_lint.py\"",
             "timeout": 60,
             "statusMessage": "Checking documentation style"
           }
@@ -29,7 +29,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"${PLUGIN_ROOT}/scripts/prose_lint.py\"",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/prose_lint.py\"",
             "timeout": 60,
             "statusMessage": "Checking documentation style"
           }

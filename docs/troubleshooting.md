@@ -4,12 +4,13 @@
 
 Check the installation layer, then check trust:
 
-1. Confirm that the relevant `hooks.json` contains Vale entries for
+1. Confirm that the plugin `hooks/hooks.json`, Codex `hooks.json`, or Claude Code
+   `settings.json` contains Vale entries for
    `PreToolUse`, `PostToolUse`, and `Stop`.
-2. Restart the Codex session after installation.
+2. Restart the client session after installation.
 3. Open `/hooks` and trust the current definitions.
 4. Trust the project if the hooks are installed in `.codex`.
-5. Confirm that hooks are enabled and that Python and Vale are on Codex's `PATH`.
+5. Confirm that hooks are enabled and that Python and Vale are on the client's `PATH`.
 
 A GUI app can have a different `PATH` from your terminal. Restart it
 from an environment that includes both executables, or configure the host's
@@ -29,15 +30,15 @@ The bundled default rules need no synchronization.
 
 ## Feedback appears twice
 
-Codex runs matching hooks from all active sources. Remove duplicate Vale
+Both clients run matching hooks from all active sources. Remove duplicate Vale
 installations across project hooks, user hooks, and an installed plugin.
 Use `/hooks` to inspect the source of each registration.
 
-## Codex finishes with unresolved findings
+## The agent finishes with unresolved findings
 
-The Stop hook requests one correction pass. When Codex reports that the Stop
+The Stop hook requests one correction pass. When the client reports that the Stop
 hook is already active, Vale surfaces remaining findings without another block.
-This prevents an endless loop. Ask Codex to fix the remaining findings, or run
+This prevents an endless loop. Ask the agent to fix the remaining findings, or run
 the direct checker to inspect them.
 
 ## Migrate the original hook
@@ -52,7 +53,7 @@ project-specific assumptions and requires matching pre-tool state for shell
 attribution. A hook copied from either version needs the matching registration
 and dependencies.
 
-Vale uses Codex's event contract, snapshots all tool calls, preserves tool
+Vale uses the shared Codex and Claude Code event contract, snapshots all tool calls, preserves tool
 output, and adds a Stop check. It uses no `jq` dependency and does not silently
 skip missing Vale. It passes absolute file paths after `--` to protect filenames
 that resemble command options.
@@ -69,3 +70,20 @@ The hook runs the Vale prose linter with the rules from
 automated subset of the
 [Google developer documentation style guide](https://developers.google.com/style/).
 It does not format Google Docs files.
+
+## Command or skill is missing
+
+Confirm that the marketplace plugin is installed and enabled, then start a new
+session. The manual hook installer installs hooks only. In Claude Code, use
+`/vale:check-prose`. In Codex, use `$vale:check-prose` or `/skills`.
+
+For `/prompts:vale`, run `scripts/install_codex_command.py` after installing the
+Codex plugin. Custom prompt support is deprecated; use the skill if your client
+does not expose that command. Do not assume a Claude Code command name works in
+Codex.
+
+## Stop hook feedback
+
+If the message contains Vale findings and the agent continues with a correction,
+this is the requested Stop block. Claude Code can display that continuation as a
+Stop hook error. A Python traceback or missing executable is a separate failure.

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Check prose"
+  short_description: "Check docs and comments with Vale."
+  default_prompt: "Use $check-prose to review my changed documentation."

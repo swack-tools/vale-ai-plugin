@@ -1,0 +1,4 @@
+interface:
+  display_name: "Google prose"
+  short_description: "Write clear technical prose and verify it with Vale."
+  default_prompt: "Use $google-prose to revise this documentation."

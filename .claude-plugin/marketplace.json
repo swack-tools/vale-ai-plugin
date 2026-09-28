@@ -1,0 +1,17 @@
+{
+  "name": "vale",
+  "owner": {
+    "name": "Swack Tools"
+  },
+  "metadata": {
+    "description": "Google documentation style for Claude Code and Codex."
+  },
+  "plugins": [
+    {
+      "name": "vale",
+      "source": "./plugins/vale",
+      "description": "Check prose with Vale hooks, commands, and skills.",
+      "category": "productivity"
+    }
+  ]
+}

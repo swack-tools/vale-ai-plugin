@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Test real Codex hook dispatch with an offline, deterministic model fixture."""
+import argparse
 import json
 import os
 from pathlib import Path
@@ -52,13 +53,19 @@ class Fixture(BaseHTTPRequestHandler):
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--plugin', action='store_true', help='Install the repository marketplace instead of project hooks.')
+    args = parser.parse_args()
+    requests.clear()
     with tempfile.TemporaryDirectory(prefix='vale-codex-smoke-') as tmp:
         base = Path(tmp).resolve()
         project = base / 'project'
         home = base / 'codex'
         project.mkdir(); home.mkdir()
         subprocess.run(['git', 'init', '-q', str(project)], check=True)
-        subprocess.run(['python3', str(REPO / 'scripts/install.py'), '--project', str(project)], check=True, capture_output=True)
+        env = dict(os.environ, CODEX_HOME=str(home))
+        if not args.plugin:
+            subprocess.run(['python3', str(REPO / 'scripts/install.py'), '--project', str(project)], check=True, capture_output=True)
         server = ThreadingHTTPServer(('127.0.0.1', 0), Fixture)
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
@@ -75,11 +82,17 @@ hooks = true
 trust_level = "trusted"
 '''
         (home / 'config.toml').write_text(config)
+        if args.plugin:
+            for command in (['codex', 'plugin', 'marketplace', 'add', str(REPO)],
+                            ['codex', 'plugin', 'add', 'vale@vale']):
+                install = subprocess.run(command, env=env, cwd=project, capture_output=True, text=True, timeout=60)
+                assert install.returncode == 0, install.stdout + install.stderr
         try:
             result = subprocess.run(['codex', 'exec', '--ephemeral', '--dangerously-bypass-hook-trust',
                                      '-C', str(project), '-s', 'danger-full-access', '--json',
-                                     'Run the supplied deterministic hook fixture.'],
-                                    env=dict(os.environ, CODEX_HOME=str(home)), capture_output=True, text=True, timeout=90)
+                                     ('$vale:check-prose smoke.md. Run the deterministic hook fixture.' if args.plugin else
+                                      'Run the supplied deterministic hook fixture.')],
+                                    env=env, capture_output=True, text=True, timeout=90)
         finally:
             server.shutdown()
         evidence = REPO / '.research'
@@ -90,6 +103,9 @@ trust_level = "trusted"
         print(result.stdout[-5000:])
         print(result.stderr[-1500:])
         assert result.returncode == 0, result.returncode
+        if args.plugin:
+            assert 'vale:check-prose' in json.dumps(requests[0]), 'Codex did not discover the checking skill'
+            assert 'vale:google-prose' in json.dumps(requests[0]), 'Codex did not discover the writing skill'
         assert any('Google.Latin' in json.dumps(r) for r in requests[1:]), 'Codex did not receive Vale feedback'
         assert (project / 'smoke.md').read_text() == 'Use this file for testing.\n', 'Fixture did not correct the prose'
         print(f'Real Codex hook dispatch passed ({len(requests)} offline model requests).')
