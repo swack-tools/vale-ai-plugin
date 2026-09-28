@@ -45,10 +45,15 @@ def safe_bytes(path, limit=vale_runner.MAX_BYTES):
 
 def policy_identity(root, deadline, wrapper_policy=None):
     """Fingerprint only a sealed local configuration and bounded style tree."""
-    if vale_runner.configuration(root) != vale_runner.PACKAGE / '.vale.ini':
+    from policy import load_policy, policy_bytes
+    effective = wrapper_policy or load_policy(root)
+    selected = vale_runner.configuration(root, effective)
+    if selected not in (vale_runner.PACKAGE / '.vale.ini', vale_runner.PACKAGE / 'profiles/ste-inspired.ini'):
         raise ValueError('Project policy dependencies are unverified; use a full-file check.')
     package = vale_runner.PACKAGE
-    config = safe_bytes(package / '.vale.ini')
+    config = safe_bytes(selected)
+    if effective.profile == 'ste-inspired':
+        config = config.replace(b'StylesPath = ../styles', b'StylesPath = styles', 1)
     if digest(config) != TRUSTED_CONFIG:
         raise ValueError('Bundled configuration changed; comparison locality needs review.')
     fingerprint = hashlib.sha256(config)
@@ -91,8 +96,6 @@ def policy_identity(root, deadline, wrapper_policy=None):
         raise ValueError('Vale version could not be verified.')
     fingerprint.update(os.fsencode(str(Path(vale).resolve())) + b'\0' + version.stdout.encode())
     from dataclasses import asdict
-    from policy import load_policy, policy_bytes
-    effective = wrapper_policy or load_policy(root)
     fingerprint.update(json.dumps(asdict(effective), sort_keys=True).encode())
     fingerprint.update(policy_bytes(root) or b'')
     return fingerprint.hexdigest()
