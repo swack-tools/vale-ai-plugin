@@ -206,6 +206,36 @@ class PerformanceTests(unittest.TestCase):
         time.sleep(.4)
         self.assertFalse(marker.exists())
 
+    def test_git_output_limit_never_uses_non_git_fallback(self):
+        module = self.deadline_module()
+        def oversized(*args, **kwargs):
+            return module.run_process([sys.executable, '-c', 'print("x" * 1000)'], max_output=64)
+        for helper in (hook.workspace, hook.snapshot, hook.state_directory):
+            with self.subTest(helper=helper.__name__), patch.object(hook, 'run_process', side_effect=oversized):
+                with self.assertRaisesRegex(RuntimeError, 'capture limit'):
+                    helper(self.root)
+        self.assertFalse((self.root / '.codex').exists())
+
+    def test_listing_limit_preserves_state_and_git_ignores(self):
+        module = self.deadline_module()
+        (self.root / '.gitignore').write_text('ignored/\n')
+        (self.root / 'ignored').mkdir()
+        (self.root / 'ignored/guide.md').write_text('We will use this, e.g. for testing.\n')
+        self.event('PreToolUse')
+        before = self.state.read_bytes()
+        self.file.write_text('We will use this, e.g. for testing.\n')
+        def limited(args, **kwargs):
+            if 'ls-files' in args:
+                return module.run_process([sys.executable, '-c', 'print("x" * 1000)'], max_output=64)
+            return module.run_process(args, **kwargs)
+        with patch.object(hook, 'run_process', side_effect=limited):
+            response = self.event('PostToolUse')
+        context = response['hookSpecificOutput']['additionalContext']
+        self.assertIn('could not complete', context)
+        self.assertIn('capture limit', context)
+        self.assertNotIn('ignored/guide.md', context)
+        self.assertEqual(self.state.read_bytes(), before)
+
     def test_output_limit_is_enforced(self):
         module = self.deadline_module()
         with self.assertRaises(RuntimeError):

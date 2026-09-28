@@ -14,7 +14,7 @@ import sys
 import tempfile
 import time
 
-from deadline import Deadline, run_process
+from deadline import Deadline, OutputLimitExceeded, run_process
 
 from lint_result import Issue, render_text
 import vale_runner
@@ -44,6 +44,9 @@ def git(cwd, *args, deadline=None):
 def workspace(cwd, *, deadline=None):
     try:
         return Path(git(cwd, 'rev-parse', '--show-toplevel', deadline=deadline).strip()).resolve()
+    except OutputLimitExceeded:
+        # A bounded Git failure is not evidence that this is a non-Git workspace.
+        raise
     except (RuntimeError, FileNotFoundError):
         return cwd
 
@@ -53,6 +56,9 @@ def snapshot(root, *, deadline=None):
     deadline.check()
     try:
         names = sorted(set(os.fsdecode(git(root, 'ls-files', '-z', '--cached', '--others', '--exclude-standard', deadline=deadline)).split('\0')) - {''})
+    except OutputLimitExceeded:
+        # A bounded Git failure is not evidence that this is a non-Git workspace.
+        raise
     except (RuntimeError, FileNotFoundError):
         names = []
         for directory, dirs, files in os.walk(root, followlinks=False):
@@ -105,6 +111,9 @@ def direct_paths(payload, root, cwd):
 def state_directory(root, *, deadline=None):
     try:
         base = Path(os.fsdecode(git(root, 'rev-parse', '--absolute-git-dir', deadline=deadline)).strip())
+    except OutputLimitExceeded:
+        # A bounded Git failure is not evidence that this is a non-Git workspace.
+        raise
     except (RuntimeError, FileNotFoundError):
         base = root / '.codex'
     directory = base / 'vale-state'

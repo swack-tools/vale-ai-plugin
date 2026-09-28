@@ -10,6 +10,10 @@ class DeadlineExceeded(TimeoutError):
     pass
 
 
+class OutputLimitExceeded(RuntimeError):
+    pass
+
+
 class Deadline:
     def __init__(self, seconds, clock=time.monotonic):
         self.clock = clock
@@ -72,7 +76,7 @@ def run_process(args, *, cwd=None, input=None, deadline=None, timeout=20, max_ou
                     else:
                         total += len(chunk)
                         if total > max_output:
-                            raise RuntimeError('Vale subprocess output exceeded the 8 MiB capture limit.')
+                            raise OutputLimitExceeded(f'Vale subprocess output exceeded the {max_output}-byte capture limit.')
                         outputs[label].extend(chunk)
         deadline.check()
         remaining = min(deadline.remaining(), end - time.monotonic())
