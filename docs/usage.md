@@ -12,8 +12,8 @@
 Claude Code exposes plugin skills as namespaced slash commands. Codex supports
 skill mentions and a skill picker. Its optional custom prompt command requires
 the [separate user installation](installation.html#legacy-slash-command-compatibility).
-Codex 0.158.0 does not recognize custom prompt commands; use `/skills` or a
-skill mention on that version. The clients do not use identical command syntax.
+Codex 0.158.0 doesn't recognize custom prompt commands. Use `/skills` or a
+skill mention on that version. The clients don't use identical command syntax.
 
 ## Review without editing
 
@@ -30,8 +30,8 @@ $vale:check-prose Review README.md and docs/installation.md without editing.
 ```
 
 The skill runs Vale and reports the file, line, rule, and suggested correction.
-If no files are specified, it uses relevant edits from the conversation or asks
-for scope. It does not silently scan your entire repository.
+If you omit files, it uses relevant edits from the conversation or asks
+for scope. It doesn't silently scan your entire repository.
 
 ## Fix findings
 
@@ -53,7 +53,7 @@ On older Codex clients that support the legacy prompt command:
 
 The agent preserves technical meaning, code examples, identifiers, and URLs.
 It checks the edited files again and reports any unresolved findings. The
-checker itself does not rewrite files or weaken your policy.
+checker itself doesn't rewrite files or weaken your policy.
 
 ## Write new documentation
 
@@ -68,19 +68,19 @@ $vale:google-prose Rewrite the installation section for a first-time contributor
 ```
 
 The writing skill applies Google documentation style and verifies the result
-with the same checker. Both skills can also be selected automatically for
-relevant natural-language requests, such as “check these docs with Vale.”
+with the same checker. Clients can also select either skill automatically for relevant
+natural-language requests, such as “check these docs with Vale.”
 
 ## Check edits from other tools
 
-Ask either agent to update a document with a shell script, editor, patch, or MCP
+Ask either agent to update a document with a shell script, editor, patch, or Model Context Protocol
 tool. The pre-tool hook records the initial file state. The post-tool hook checks
 observed changes, regardless of the tool name. The Stop hook checks touched files
 before the turn ends and can request one correction pass.
 
 Tools that only change remote documents are outside this local-file workflow.
-A failed Claude Code tool call can skip `PostToolUse`; its local changes are
-checked by the next successful post-tool event or the Stop event.
+A failed Claude Code tool call can skip `PostToolUse`. The next successful post-tool event or Stop
+checks its local changes.
 
 ## Run without an agent
 
@@ -109,12 +109,12 @@ python3 plugins/vale/scripts/prose_lint.py --format json --check ./README.md
 Schema version `1` includes `status`, `config_path`, `requested_files`,
 `submitted_files`, `skipped_files`, `findings`, `errors`, and `coverage`.
 Findings retain rule, severity, message, source location, and available
-suggestion metadata. The checker does not apply suggestions.
+suggestion metadata. The checker doesn't apply suggestions.
 
-`submitted_files` records completed engine invocations. It does not prove that
+`submitted_files` records completed engine invocations. It doesn't prove that
 every file matched a rule. An empty Vale result can mean either no findings or
 no matching configuration. Coverage for a project configuration is therefore
-reported as unknown; the checker does not silently add Google rules.
+reported as unknown. The checker doesn't silently add Google rules.
 
 ### Diagnose an installation
 
@@ -124,15 +124,89 @@ python3 plugins/vale/scripts/prose_lint.py --doctor --format json
 ```
 
 Doctor reports the selected executable and version, configuration, workspace,
-parser requirements, and visible project installation files. It does not
+parser requirements, and visible project installation files. It doesn't
 install dependencies, download rules, or edit settings. Missing optional parsers
 produce format-specific warnings. An unusable engine or configuration returns
-exit code `2`. Configuration files alone cannot prove that a running client
-loaded the hook; inspect the client's hook settings for activation.
+exit code `2`. Configuration files alone can't prove that a running client
+loaded the hook. Inspect the client's hook settings for activation.
 
 ## Project policy
 
 An existing `.vale.ini` takes precedence. Keep project vocabulary and deliberate
-exceptions there; see [configuration](configuration.html). Neither skill turns
+exceptions there. See [configuration](configuration.html). Neither skill turns
 off rules just to make a check pass. A clean check covers the configured rules,
 not every editorial recommendation in the Google style guide.
+
+## Choose the audit scope
+
+The default `--scope changed-files` checks all findings in each selected file.
+It doesn't restrict findings to edited lines. Hooks select files from observed
+changes. Manual `--check` selects the files you name.
+
+For an explicit audit of every eligible workspace file:
+
+```sh
+python3 plugins/vale/scripts/prose_lint.py --all --format json
+```
+
+This includes tracked and eligible untracked files under the normal exclusions.
+It ignores session baselines. `--all`, `--check`, and `--doctor` are mutually
+exclusive. An empty selection returns status `skipped` and exit code `2`.
+
+For findings introduced since a specific Git commit:
+
+```sh
+python3 plugins/vale/scripts/prose_lint.py --check ./docs/guide.md --scope new-findings --base-ref main --format json
+```
+
+Choose the reference explicitly. The checker resolves it to a commit and reads
+old blobs without checking out that commit or modifying your files. New files
+use an empty baseline. A missing reference or a workspace without Git produces
+an incomplete check. Prefix a reference that starts with a hyphen using the
+argument form `--base-ref=VALUE`.
+
+Manual new-findings mode requires both `--check FILE...` and `--base-ref REV`.
+It rejects `--all` and `--doctor`. The default scope rejects `--base-ref`.
+A full audit remains available through `--all` or an ordinary `--check`.
+
+### Read a comparison result
+
+The schema's optional `comparison` object contains:
+
+| Field | Meaning |
+| --- | --- |
+| `mode` | `new-findings` |
+| `baseline_source` | `session`, or `git:` followed by the resolved commit |
+| `new` | Number of actionable findings, including conservative fallbacks |
+| `existing` | Matched occurrences with unchanged context |
+| `resolved` | Baseline occurrences with no safe match in the current result |
+| `actionable_indexes` | Zero-based indexes into the complete `findings` array |
+| `fallback_reason` | Reason for full-file feedback, or `null` |
+
+The raw `findings` array retains existing findings. Text feedback, findings
+status, and exit code `1` use the actionable subset. Errors still produce
+status `incomplete` and exit code `2`. Zero actionable findings can therefore
+coexist with raw findings and status `clean`. Report this as “no new actionable
+findings,” not as a clean full-file audit.
+
+The `resolved` count isn't proof that an author fixed each occurrence. Changed
+context can make an old occurrence unmatched and the current occurrence
+potentially new. A fallback counts all current findings as actionable.
+See [comparison limits](behavior.html#comparison-limits) before relying on noise reduction.
+
+### Ask a skill to compare
+
+Claude Code:
+
+```text
+/vale:check-prose Check only new findings in docs/guide.md relative to main. Report any fallback.
+```
+
+Codex:
+
+```text
+$vale:check-prose Audit every eligible workspace file with --all. Review only.
+```
+
+The checking skill requires an explicit reference for manual comparisons.
+It doesn't infer a session from the most recent state file.

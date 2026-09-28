@@ -5,19 +5,19 @@
 This repository is a marketplace for both clients. It follows the same
 repository layout as
 [Trakt AI plugin](https://github.com/swack-tools/trakt-ai-plugin).
-You do not need a separate organization marketplace to install Vale.
+You don't need a separate organization marketplace to install Vale.
 
 | Client | Catalog | Plugin manifest |
 | --- | --- | --- |
 | Codex | `.agents/plugins/marketplace.json` | `plugins/vale/.codex-plugin/plugin.json` |
 | Claude Code | `.claude-plugin/marketplace.json` | `plugins/vale/.claude-plugin/plugin.json` |
 
-Both catalogs are named `vale` and both point to `./plugins/vale`. The install
+Both catalogs use the name `vale` and point to `./plugins/vale`. The install
 identifier is `vale@vale`: plugin name, then marketplace name. The package
 contains the checker, pinned Google rules, shared hooks, and two skills. It
-requires no MCP server, hosted service, OAuth 2.0 connection, or API key.
+requires no Model Context Protocol server, hosted service, OAuth 2.0 connection, or API key.
 
-These are repository marketplaces. Publishing them does not list Vale in a
+These are repository marketplaces. Publishing them doesn't list Vale in a
 client's official curated marketplace.
 
 ## Add the repository
@@ -76,20 +76,20 @@ that points to the package's location in the new repository. Use that
 marketplace's name after `@` when installing.
 
 Keep one active Vale installation per workspace. A manual hook installation and
-an enabled marketplace plugin both register hooks; neither replaces the other.
+an enabled marketplace plugin both register hooks. Neither replaces the other.
 
 ## Host compatibility
 
-`hooks/hooks.json` is discovered by both clients. It uses the quoted
-`CLAUDE_PLUGIN_ROOT` path. Claude Code defines that variable for plugin hooks;
+Both clients discover `hooks/hooks.json`. It uses the quoted
+`CLAUDE_PLUGIN_ROOT` path. Claude Code defines that variable for plugin hooks.
 Codex also defines it for compatibility. The runtime emits shared event JSON
 for `PreToolUse`, `PostToolUse`, and `Stop`.
 
-Skills resolve the checker relative to their own installed path. They do not
+Skills resolve the checker relative to their own installed path. They don't
 assume that plugin environment variables are available inside tools run by the
-agent. Claude Code exposes skills as slash commands. Codex uses skill mentions;
-older clients that still support custom prompts can use the `/prompts:vale`
-wrapper. Codex 0.158.0 rejects that legacy command; use `/skills` or
+agent. Claude Code exposes skills as slash commands. Codex uses skill mentions.
+Older clients that still support custom prompts can use the `/prompts:vale`
+wrapper. Codex 0.158.0 rejects that legacy command. Use `/skills` or
 `$vale:check-prose` instead.
 
 References include [Codex plugin packaging](https://developers.openai.com/plugins/build/plugins),
