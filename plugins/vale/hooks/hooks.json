@@ -1,0 +1,40 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${PLUGIN_ROOT}/scripts/prose_lint.py\"",
+            "timeout": 60,
+            "statusMessage": "Checking documentation style"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${PLUGIN_ROOT}/scripts/prose_lint.py\"",
+            "timeout": 60,
+            "statusMessage": "Checking documentation style"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${PLUGIN_ROOT}/scripts/prose_lint.py\"",
+            "timeout": 60,
+            "statusMessage": "Checking documentation style"
+          }
+        ]
+      }
+    ]
+  }
+}

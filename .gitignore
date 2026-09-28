@@ -1,0 +1,8 @@
+.research/
+.firecrawl/
+.venv/
+__pycache__/
+*.pyc
+site/
+.env
+.env.*

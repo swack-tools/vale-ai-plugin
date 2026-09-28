@@ -1,0 +1,18 @@
+{
+  "name": "vale",
+  "version": "0.1.0",
+  "description": "Google documentation style checks after Codex edits and before it finishes.",
+  "author": {
+    "name": "Swack Tools"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Vale",
+    "shortDescription": "Check docs and comments with Vale.",
+    "longDescription": "Check changed prose with bundled Google style rules after tools run and before Codex finishes.",
+    "developerName": "Swack Tools",
+    "category": "Productivity",
+    "capabilities": [],
+    "defaultPrompt": "Check the documentation style in the files I changed."
+  }
+}
