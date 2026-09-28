@@ -188,6 +188,21 @@ print(json.dumps(prose_lint.run_hook(dict(hook_event_name='PostToolUse',session_
                 if proc.poll() is None: proc.kill(); proc.wait()
         self.assertEqual(set(json.loads(self.state.read_text())['touched']), {'a.md', 'b.md'})
 
+    def test_report_permission_denial_retains_findings(self):
+        from lint_result import Finding
+        result = hook.empty_result(self.root, ['guide.md'])
+        result.findings.append(Finding(str(self.file), 1, 1, 2, 'House.Example', 'warning', 'x' * 17000, 'We'))
+        result.finish()
+        with patch.object(hook, 'save_report', side_effect=PermissionError('Permission denied')):
+            response = hook.feedback('PostToolUse', result, root=self.root, session='perf')
+        context = response['hookSpecificOutput']['additionalContext']
+        self.assertIn('could not complete', context)
+        self.assertIn('Permission denied', context)
+        self.assertNotIn('Full report:', context)
+        self.assertEqual(result.status, 'incomplete')
+        self.assertEqual(len(result.findings), 1)
+        self.assertLessEqual(len(context), 16000)
+
     def test_simultaneous_pre_initializes_only_once(self):
         code = """import json,sys,time
 from pathlib import Path

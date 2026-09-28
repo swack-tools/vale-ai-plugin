@@ -110,8 +110,9 @@ and state writes. Compare runs on the same machine; results depend on filesystem
 and system load. Unit tests verify that repeated pre-tool events skip discovery
 and unchanged events preserve state, without machine-specific timing thresholds.
 
-A local macOS comparison with 20,000 small Python files measured repeated
-pre-tool events at 0.832 seconds before and 0.096 seconds after the fast path.
-Post-tool events measured 0.865 and 0.900 seconds, respectively: broad edit
+A local macOS comparison with 20,000 small Python files alternated the old and
+new hooks over five samples after a warm-up. Repeated pre-tool events measured
+2.074 seconds before and 0.228 seconds after the fast path. Post-tool events
+measured 1.718 and 1.715 seconds, respectively: broad edit
 detection still requires a scan. These measurements demonstrate the removed
 pre-tool work, not a guarantee for other repositories or machines.
