@@ -66,5 +66,109 @@
     "protected_literals": [
       "`We will retry, e.g. later.`"
     ]
+  },
+  {
+    "case_id": "condition-before-command",
+    "suite": "procedural-prose",
+    "category": "condition-before-command",
+    "format": "md",
+    "input_file": "evals/fixtures/procedural/condition-before-command.md",
+    "prompt_file": "evals/prompts/procedural/condition-before-command.txt",
+    "protected_literals": [
+      "service restart --wait 30",
+      "30",
+      "may",
+      "the health check passes"
+    ],
+    "review_focus": "Put the complete condition before its instruction. Keep the 30-second value and uncertainty."
+  },
+  {
+    "case_id": "compound-negated-condition",
+    "suite": "procedural-prose",
+    "category": "compound-negated-condition",
+    "format": "md",
+    "input_file": "evals/fixtures/procedural/compound-negated-condition.md",
+    "prompt_file": "evals/prompts/procedural/compound-negated-condition.txt",
+    "protected_literals": [
+      "replica promote --id node_2",
+      "must not",
+      "the backup is verified",
+      "the primary is not reachable"
+    ],
+    "review_focus": "Preserve AND, negation, only-if scope, and the prohibition. Do not reinterpret either condition as sufficient."
+  },
+  {
+    "case_id": "warning-consequence",
+    "suite": "procedural-prose",
+    "category": "warning-consequence",
+    "format": "md",
+    "input_file": "evals/fixtures/procedural/warning-consequence.md",
+    "prompt_file": "evals/prompts/procedural/warning-consequence.txt",
+    "protected_literals": [
+      "cache clear --all",
+      "save pending jobs",
+      "unsaved jobs",
+      "cannot be recovered"
+    ],
+    "review_focus": "Keep the warning and irreversible consequence before the destructive action. Keep saving jobs as a prerequisite."
+  },
+  {
+    "case_id": "two-actions",
+    "suite": "procedural-prose",
+    "category": "two-actions",
+    "format": "md",
+    "input_file": "evals/fixtures/procedural/two-actions.md",
+    "prompt_file": "evals/prompts/procedural/two-actions.txt",
+    "protected_literals": [
+      "backup verify --id snap_7",
+      "service start",
+      "the service is stopped",
+      "before verification"
+    ],
+    "review_focus": "Separate the ordered actions while keeping the initial stopped-service condition in scope for both steps."
+  },
+  {
+    "case_id": "quoted-command",
+    "suite": "procedural-prose",
+    "category": "quoted-command",
+    "format": "md",
+    "input_file": "evals/fixtures/procedural/quoted-command.md",
+    "prompt_file": "evals/prompts/procedural/quoted-command.txt",
+    "protected_literals": [
+      "\"We will retry, e.g. later.\"",
+      "client retry --count 1",
+      "should",
+      "may",
+      "once",
+      "the token is valid"
+    ],
+    "review_focus": "Preserve the exact quoted error, command, recommended strength of should, and uncertainty of may."
+  },
+  {
+    "case_id": "marketing-prose",
+    "suite": "procedural-prose",
+    "category": "marketing-prose",
+    "format": "md",
+    "input_file": "evals/fixtures/procedural/marketing-prose.md",
+    "prompt_file": "evals/prompts/procedural/marketing-prose.txt",
+    "protected_literals": [
+      "Our dashboard brings your team's ideas together. Explore a bright new way to plan your day."
+    ],
+    "review_focus": "Do not impose a procedural rewrite on marketing prose. Preserve this negative control."
+  },
+  {
+    "case_id": "clear-procedure",
+    "suite": "procedural-prose",
+    "category": "clear-procedure",
+    "format": "md",
+    "input_file": "evals/fixtures/procedural/clear-procedure.md",
+    "prompt_file": "evals/prompts/procedural/clear-procedure.txt",
+    "protected_literals": [
+      "service restart --wait 30",
+      "30",
+      "may",
+      "the backup is verified"
+    ],
+    "review_focus": "Retain this already-clear procedure, numeric delay, permission, and ordering. Avoid unnecessary edits."
   }
 ]

@@ -96,3 +96,68 @@ class ProfileTests(unittest.TestCase):
         self.assertEqual(code, 2)
         self.assertIn('base-ref', str(result['errors']))
         self.assertTrue(result['config_path'].endswith('/profiles/ste-inspired.ini'))
+
+
+class ProceduralEvaluationTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name) / 'evaluation'
+        self.script = ROOT / 'scripts/evaluate_prose.py'
+        run = subprocess.run([sys.executable, str(self.script), '--suite', 'procedural-prose', '--prepare', str(self.root)], capture_output=True, text=True)
+        self.assertEqual(run.returncode, 0, run.stderr)
+
+    def complete(self):
+        import hashlib
+        cases = {c['case_id']: c for c in json.loads((ROOT / 'evals/cases.json').read_text()) if c.get('suite') == 'procedural-prose'}
+        self.assertEqual(set(cases), {'condition-before-command', 'compound-negated-condition', 'warning-consequence', 'two-actions', 'quoted-command', 'marketing-prose', 'clear-procedure'})
+        trials = json.loads((self.root / 'trials.json').read_text())
+        self.assertEqual(len(trials), 14)
+        for i, t in enumerate(trials):
+            t.update(host='codex', client_version='fixture', model='fixture', timestamp='2026-09-28T12:00:00Z', session_id=f's-{i}', home=f'h-{i}', workspace=f'w-{i}', settings={'effort':'medium'}, reviewer={'kind':'agent','id':'synthetic-test'}, semantic_verdict='pass', notes='Synthetic validator proof, not a model trial.')
+            t['review_checks'] = dict.fromkeys(t['review_checks'], 'pass')
+            t['preflight'].update(fresh_session=True, isolated_home=True, isolated_workspace=True)
+            data = (ROOT / cases[t['case_id']]['input_file']).read_bytes()
+            (self.root / t['output_file']).write_bytes(data)
+            t['reviewed_output_sha256'] = hashlib.sha256(data).hexdigest()
+        return trials
+
+    def validate(self, trials=None, suite='procedural-prose'):
+        if trials is not None:
+            (self.root / 'trials.json').write_text(json.dumps(trials))
+        run = subprocess.run([sys.executable, str(self.script), '--suite', suite, '--results', str(self.root), '--format', 'json'], capture_output=True, text=True)
+        self.assertFalse(run.stderr)
+        return run.returncode, json.loads(run.stdout)
+
+    def test_unrun_procedural_suite_is_incomplete(self):
+        code, report = self.validate()
+        self.assertEqual(code, 2)
+        self.assertEqual(report['suite'], 'procedural-prose')
+
+    def test_all_procedural_cases_can_be_reviewed(self):
+        code, report = self.validate(self.complete())
+        self.assertEqual(code, 0, report)
+        self.assertEqual(len(report['pairs']), 7)
+        self.assertEqual(report['lint']['status'], 'not_run')
+
+    def test_wrong_suite_cannot_accept_procedural_evidence(self):
+        self.assertEqual(self.validate(self.complete(), suite='google-prose')[0], 2)
+
+    def test_procedural_literals_and_review_failures_remain_actionable(self):
+        import hashlib
+        trials = self.complete()
+        changes = [('condition-before-command','30','300'),
+                   ('compound-negated-condition','must not','must'),
+                   ('quoted-command','should','must'),
+                   ('two-actions','snap_7','snap_8')]
+        for case, old, new in changes:
+            with self.subTest(case=case):
+                trial = next(t for t in trials if t['case_id'] == case and t['arm'] == 'skill')
+                path = self.root / trial['output_file']; original=path.read_bytes()
+                path.write_text(original.decode().replace(old,new))
+                trial['reviewed_output_sha256']=hashlib.sha256(path.read_bytes()).hexdigest()
+                code, report = self.validate(trials)
+                self.assertEqual(code, 1, report)
+                path.write_bytes(original); trial['reviewed_output_sha256']=hashlib.sha256(original).hexdigest()
+        trials[0]['review_checks']['prerequisites']='fail'; trials[0]['semantic_verdict']='fail'
+        self.assertEqual(self.validate(trials)[0],1)

@@ -1,0 +1,1 @@
+Run `cache clear --all`. Warning: Before you clear the cache, save pending jobs. Clearing the cache deletes unsaved jobs. The jobs cannot be recovered.

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Procedural prose"
+  short_description: "Revise procedures while preserving technical meaning."
+  default_prompt: "Use $procedural-prose to review this runbook."
