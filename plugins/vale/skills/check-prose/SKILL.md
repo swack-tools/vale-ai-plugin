@@ -57,10 +57,19 @@ python3 /absolute/plugin/scripts/prose_lint.py --check ./guide.md --scope new-fi
 
 Use the user's requested revision. Ask for it if absent. Never choose a session
 from state filenames. This mode requires Git and doesn't combine with `--all`.
-The default `changed-files` scope reports every finding in the selected files.
+The bundled `changed-files` default reports every finding in the selected files.
+A project `.vale-plugin.toml` can select `new-findings`. Inspect effective
+settings and their origins with `--doctor --format json` when scope is unclear.
+Ask for a missing baseline even when the project selected comparison mode.
 
 Comparison JSON retains all raw `findings`. Only indexes in
 `comparison.actionable_indexes` affect findings status and exit code `1`.
 Report `comparison.fallback_reason` when present. A fallback keeps full-file
 findings actionable. Zero new findings doesn't mean zero existing findings or
 complete Google style compliance. For a full audit, run `--all` without a baseline.
+
+A `skipped` result or an entry in `skipped_files` means the wrapper didn't check
+that operand. Report the path and reason, even when other files passed. Don't
+call an excluded document clean or bypass its policy. Reviewed vocabulary and
+format recipes live in the [configuration guide](https://vale.swacktech.com/configuration.html).
+Don't add accepted terms or weaken exclusions just to clear findings.

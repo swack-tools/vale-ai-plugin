@@ -42,6 +42,8 @@ def inspect_environment(root, *, cli_overrides=None):
         found = shutil.which(parser) if parser else None
         report['formats'][extension] = dict(status='missing_parser' if parser and not found else 'available',
                                                 parser=parser, executable=found)
+    for extension, view in policy.views.items():
+        report['formats'][extension] = dict(status='configured_view', parser=None, executable=None, view=view)
     end = time.monotonic() + 20
     try:
         if not vale:

@@ -139,7 +139,8 @@ not every editorial recommendation in the Google style guide.
 
 ## Choose the audit scope
 
-The default `--scope changed-files` checks all findings in each selected file.
+The bundled default `--scope changed-files` checks all findings in each selected file.
+Project policy can change this default. See [selection and precedence](configuration.html#project-selection-policy).
 It doesn't restrict findings to edited lines. Hooks select files from observed
 changes. Manual `--check` selects the files you name.
 
@@ -167,7 +168,10 @@ argument form `--base-ref=VALUE`.
 
 Manual new-findings mode requires both `--check FILE...` and `--base-ref REV`.
 It rejects `--all` and `--doctor`. The default scope rejects `--base-ref`.
-A full audit remains available through `--all` or an ordinary `--check`.
+A full audit remains available through `--all` or `--check FILE --scope changed-files`.
+A project-selected `new-findings` scope also requires `--base-ref` for manual
+file checks. `--all` always performs a full audit, and `--doctor` reports the
+effective scope without comparing documents.
 
 ### Read a comparison result
 
@@ -210,3 +214,19 @@ $vale:check-prose Audit every eligible workspace file with --all. Review only.
 
 The checking skill requires an explicit reference for manual comparisons.
 It doesn't infer a session from the most recent state file.
+
+## Inspect selection policy
+
+Use `--doctor --format json` to inspect effective scope, include patterns,
+exclude patterns, profile, and each setting's origin. The project policy applies
+to marketplace hooks, manual installations, and direct checks in both clients.
+
+```sh
+python3 plugins/vale/scripts/prose_lint.py --doctor --format json
+python3 plugins/vale/scripts/prose_lint.py --check docs/guide.md --scope changed-files
+```
+
+A policy-excluded file has a `skipped_files` entry with its reason. A request
+containing only skipped files exits `2` with status `skipped`. Report those files
+as unchecked. Don't remove exclusions or accept vocabulary terms merely to
+obtain a clean result. See the [project recipes](configuration.html).

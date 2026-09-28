@@ -66,7 +66,11 @@ def snapshot(root, *, deadline=None, policy=None):
         for directory, dirs, files in os.walk(root, followlinks=False):
             deadline.check()
             dirs[:] = [d for d in dirs if d not in (HARD_EXCLUDED if policy.include else EXCLUDED) and not (Path(directory) / d).is_symlink()]
-            names.extend(str((Path(directory) / f).relative_to(root)) for f in files if policy.supports(f))
+            for filename in files:
+                deadline.check()
+                name = str((Path(directory) / filename).relative_to(root))
+                if policy.supports(name) and policy.selected(name):
+                    names.append(name)
             if len(names) > MAX_FILES:
                 raise RuntimeError('More than 20,000 prose files; narrow the workspace or exclude generated files.')
     result = {}

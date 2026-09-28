@@ -32,3 +32,11 @@ project conventions.
 The checker doesn't certify the entire Google style guide. Report unresolved
 findings or an unavailable checker explicitly. Don't format Google Docs files
 or apply a source-code formatter as part of this skill.
+
+A project `.vale-plugin.toml` also controls selection and scope. Use `--doctor
+--format json` to inspect effective settings when needed. If the selected scope
+is `new-findings`, ask for an explicit Git revision before verification. Don't
+invent a baseline or silently override the scope. Follow the companion
+`check-prose` skill for comparison commands and result handling. Report skipped
+files as unchecked, with their reasons. Keep reviewed vocabulary unchanged
+unless the user requests a terminology policy change.

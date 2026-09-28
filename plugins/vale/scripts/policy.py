@@ -23,6 +23,7 @@ class EffectivePolicy:
     profile: str = 'auto'
     origins: dict[str, str] = field(default_factory=lambda: {k: 'default' for k in ('schema_version', 'scope', 'include', 'exclude', 'profile')})
     formats: dict[str, str] = field(default_factory=dict)
+    views: dict[str, str] = field(default_factory=dict)
 
     def selected(self, name):
         path = Path(name)
@@ -39,7 +40,7 @@ class EffectivePolicy:
 
     def supports(self, name):
         suffix = Path(name).suffix
-        return suffix.lower() in EXTENSIONS or (bool(self.include) and suffix[1:] in self.formats)
+        return suffix.lower() in EXTENSIONS or (bool(self.include) and (suffix[1:] in self.formats or suffix[1:] in self.views))
 
 
 def policy_bytes(root):
@@ -97,7 +98,7 @@ def load_policy(root, cli_overrides=None):
     config = root / '.vale.ini'
     if defaults['profile'] == 'google' and (config.exists() or config.is_symlink()):
         raise ValueError('profile=google conflicts with the root .vale.ini; use profile=auto or remove the root configuration.')
-    formats = {}
+    formats, views = {}, {}
     if defaults['include'] and config.is_file():
         ini = configparser.ConfigParser(interpolation=None, strict=False)
         ini.optionxform = str
@@ -108,6 +109,15 @@ def load_policy(root, cli_overrides=None):
         if ini.has_section('formats'):
             formats = {key: value for key, value in ini.items('formats')
                        if '.' + value in EXTENSIONS and key.lower() not in ('yaml', 'yml', 'json')}
+        # Deliberately support explicit single-extension data sections. Vale owns
+        # View evaluation and errors; the wrapper never treats data as plain text.
+        for extension in ('yaml', 'yml', 'json'):
+            section = '*.' + extension
+            view = ini.get(section, 'View', fallback='').strip()
+            if view:
+                if ini.has_section('formats') and any(key.lower() == extension for key in ini['formats']):
+                    raise ValueError(f'Do not combine a .{extension} View with a format alias.')
+                views[extension] = view
     defaults['include'] = tuple(defaults['include'])
     defaults['exclude'] = tuple(defaults['exclude'])
-    return EffectivePolicy(**defaults, origins=origins, formats=formats)
+    return EffectivePolicy(**defaults, origins=origins, formats=formats, views=views)

@@ -236,3 +236,49 @@ Markdown names. Add an alias for each additional case spelling you use.
 a filename glob alone doesn't select the correct parser. The wrapper accepts
 aliases only to its supported formats and retains project coverage as unknown.
 It doesn't modify project `.vale.ini` files.
+
+## Select OpenAPI descriptions
+
+[Vale Views](https://vale.sh/features/views) can extract prose from structured
+data. The verified recipe uses Vale 3.23.0, its built-in `dasel` engine, and
+Markdown parsing for description strings. It needs no separate parser service.
+
+Create `.vale/styles/config/views/OpenAPI.yml`:
+
+```yaml
+engine: dasel
+scopes:
+  - name: description
+    expr: search(has("description")).map(description)
+    type: md
+```
+
+Declare the View in root `.vale.ini`, with your installed Google package:
+
+```ini
+StylesPath = .vale/styles
+MinAlertLevel = warning
+
+[*.yaml]
+BasedOnStyles = Google
+View = OpenAPI
+```
+
+Select the files in `.vale-plugin.toml`:
+
+```toml
+include = ["api/*.yaml"]
+```
+
+The wrapper recognizes explicit `*.yaml`, `*.yml`, and `*.json` sections with a
+nonempty `View`. Use a separate section for each extension. Combined brace
+sections don't enable additional data extensions in this wrapper. Don't combine
+a data View with a format alias to plain text. That combination produces an
+incomplete check.
+
+The YAML integration fixture places the same Latin abbreviation in a
+`description` and an `operationId`. The View returns exactly one `Google.Latin`
+finding at the description's original line 5, columns 26–29. It ignores the
+identifier. The wrapper passes paths and finding locations through unchanged.
+Review selectors before adopting a View, and test representative source files.
+Other extractors and data formats remain outside this verified recipe.

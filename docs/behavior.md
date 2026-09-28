@@ -55,7 +55,8 @@ Source extensions: `.rs`, `.py`, `.sh`, `.pl`, `.js`, `.jsx`, `.ts`, `.tsx`, `.g
 The bundled configuration accepts uppercase and mixed-case extensions. The
 checker uses a canonical logical filename for those checks and reports the
 original path. It doesn't rename files. Project configurations remain
-responsible for their own patterns and format mappings.
+responsible for their own patterns and format mappings. See the
+[format and OpenAPI recipes](configuration.html#additional-filename-extensions).
 
 AsciiDoc requires `asciidoctor`, and reStructuredText requires `rst2html`.
 Refer to [installation requirements](installation.html) for setup.
@@ -70,7 +71,7 @@ apply a code formatter or rewrite executable statements.
 - Edits outside that root, including a shell command's hidden external working
   directory, are outside coverage. Start an agent session in that workspace.
 - The checker excludes symlinked files and directories.
-- Built-in exclusions include `.git`, `.codex`, `.claude`, `.agents`, `.vale`, `.venv`, `node_modules`,
+- Default exclusions include `.git`, `.codex`, `.claude`, `.agents`, `.vale`, `.venv`, `node_modules`,
   `target`, `dist`, `build`, `vendor`, and `__pycache__`.
 - Each eligible file must be at most 1 MiB. A workspace can contain at most
   20,000 eligible files. Exceeding a limit reports an incomplete check.
@@ -216,3 +217,17 @@ remain incomplete checks. A fallback with no current findings reports its
 limitation without blocking Stop. There is no successful-result cache. An
 opt-in comparison can run Vale once per current document and once per baseline
 document, within the shared work budget.
+
+## Policy changes during a session
+
+Hooks reload `.vale-plugin.toml` on each event. Invalid policy produces an
+incomplete-check diagnostic, including during an initialized pre-tool event.
+An include list can opt into generated directories, but it can't override
+Git internals, agent configuration trees, containment, or symlink protection.
+See [selection rules](configuration.html#project-selection-policy).
+
+Changing policy doesn't reconstruct a session's original source text. Wrapper
+policy changes invalidate comparison against the initial policy. Start a new
+session after changing scope or coverage. Project `.vale.ini` files and their
+vocabularies keep full-file feedback because their dependencies remain
+unverified for comparison.

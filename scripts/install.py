@@ -33,7 +33,7 @@ def atomic_json(path, data):
             os.unlink(temp)
 
 
-def install(config, user, uninstall, host="codex", feedback_scope="changed-files"):
+def install(config, user, uninstall, host="codex", feedback_scope=None):
     destination = config / 'vale'
     hooks_file = config / ('settings.json' if host == 'claude' else 'hooks.json')
     if config.is_symlink() or destination.is_symlink() or hooks_file.is_symlink():
@@ -61,7 +61,7 @@ def install(config, user, uninstall, host="codex", feedback_scope="changed-files
         staging = Path(tempfile.mkdtemp(prefix='.vale-install-', dir=config))
         try:
             shutil.copytree(SOURCE, staging, dirs_exist_ok=True, ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
-            (staging / OWNERSHIP).write_text(json.dumps({'package': 'vale', 'version': '0.3.0'}) + '\n')
+            (staging / OWNERSHIP).write_text(json.dumps({'package': 'vale', 'version': '0.4.0'}) + '\n')
             # Remove only files from our previous installed package; backups remain.
             if destination.exists():
                 shutil.rmtree(destination)
@@ -73,8 +73,8 @@ def install(config, user, uninstall, host="codex", feedback_scope="changed-files
         if host == "claude":
             command = ('python3 "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/vale/scripts/prose_lint.py" # vale-hook'
                        if user else PROJECT_COMMAND.replace(".codex/vale", ".claude/vale"))
-        if feedback_scope == 'new-findings':
-            command = command.removesuffix(MARKER) + '--scope new-findings ' + MARKER
+        if feedback_scope is not None:
+            command = command.removesuffix(MARKER) + f'--scope {feedback_scope} ' + MARKER
         for event in ('PreToolUse', 'PostToolUse', 'Stop'):
             hooks.setdefault(event, []).append({'hooks': [{'type': 'command', 'command': command,
                                                          'timeout': 60, 'statusMessage': 'Checking documentation style'}]})
@@ -103,7 +103,7 @@ def main():
     scope.add_argument('--user', action='store_true')
     parser.add_argument('--uninstall', action='store_true')
     parser.add_argument('--host', choices=('codex', 'claude'), default='codex')
-    parser.add_argument('--feedback-scope', choices=('changed-files', 'new-findings'), default='changed-files',
+    parser.add_argument('--feedback-scope', choices=('changed-files', 'new-findings'),
                         help='Select hook feedback. Reapply this option when updating an opt-in installation.')
     args = parser.parse_args()
     directory = '.claude' if args.host == 'claude' else '.codex'

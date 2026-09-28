@@ -194,9 +194,15 @@ See [state storage](behavior.html#state-storage) for cleanup instructions.
 
 ## Enable automatic new-findings feedback
 
-Marketplace hooks keep the default full-file feedback for changed files.
-For automatic comparison, use a hook-only installation and select its feedback
-scope explicitly:
+Marketplace hooks and manual installations read `.vale-plugin.toml` from each
+workspace. To enable comparison for either client, add this project setting:
+
+```toml
+scope = "new-findings"
+```
+
+For a hook-only installation, an explicit installer option takes precedence
+over project scope:
 
 ```sh
 python3 scripts/install.py --host codex --project /path/to/project --feedback-scope new-findings
@@ -213,9 +219,10 @@ initial documents before editing. Read the [source-text retention and limits](be
 before enabling this mode. It's most useful with the bundled Google policy.
 Custom project policies keep full-file feedback.
 
-Repeat `--feedback-scope new-findings` when updating this installation. Omitting
-it restores `changed-files`. To restore the default explicitly, repeat the
-installer with `--feedback-scope changed-files`. Changing scope during an active
+Repeat an explicit `--feedback-scope` when updating to retain that override.
+Omitting it restores project policy, or `changed-files` when no project scope
+exists. Use `--feedback-scope changed-files` to force full-file feedback even
+when the project selects comparison. Changing scope during an active
 session doesn't reconstruct its original source text. Start a new session.
 
 For a locally maintained plugin package, the equivalent hook command is:
@@ -226,4 +233,5 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prose_lint.py" --scope new-findings
 
 Apply it to `PreToolUse`, `PostToolUse`, and `Stop`. Keep local package changes
 under your own version control. A marketplace update can replace them.
-Manual skill comparisons work independently of the automatic hook scope.
+Manual skill comparisons also read project scope. An explicit command option
+takes precedence. Manual comparisons always require a Git reference.

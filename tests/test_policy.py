@@ -202,3 +202,55 @@ class PolicyTests(unittest.TestCase):
         _, result = self.cli('--check', 'guide.md', '--scope', 'new-findings', '--base-ref', 'HEAD')
         self.assertIn('Wrapper policy', result['comparison']['fallback_reason'])
         self.assertEqual(result['comparison']['existing'], 0)
+
+    def test_openapi_view_selects_prose_and_preserves_source_location(self):
+        import shutil
+        shutil.copytree(ROOT / 'plugins/vale/styles', self.root / '.vale/styles')
+        self.write('.vale/styles/config/views/OpenAPI.yml', 'engine: dasel\nscopes:\n  - name: description\n    expr: search(has("description")).map(description)\n    type: md\n')
+        self.write('.vale.ini', 'StylesPath = .vale/styles\nMinAlertLevel = warning\n[*.yaml]\nBasedOnStyles = Google\nView = OpenAPI\n')
+        self.policy('include = ["api.yaml"]\n')
+        source = 'openapi: 3.1.0\ninfo:\n  title: Example\n  version: 1.0.0\n  description: Use this, e.g. for testing.\n  operationId: Use this, e.g. for testing.\n'
+        self.write('api.yaml', source)
+        code, result = self.cli('--all')
+        self.assertEqual(code, 1)
+        self.assertEqual(result['submitted_files'], ['api.yaml'])
+        self.assertEqual(len(result['findings']), 1)
+        finding = result['findings'][0]
+        self.assertEqual((finding['rule'], finding['line'], finding['column'], finding['end_column']), ('Google.Latin', 5, 26, 29))
+        self.assertEqual(source.splitlines()[4][25:29], finding['match'])
+        _, report = self.cli('--doctor')
+        self.assertEqual(report['formats']['yaml']['view'], 'OpenAPI')
+
+    def test_view_cannot_be_combined_with_unscoped_data_alias(self):
+        self.write('api.yaml')
+        self.write('.vale.ini', '[formats]\nyaml = txt\n[*.yaml]\nBasedOnStyles = Vale\nView = OpenAPI\n')
+        self.policy('include = ["*.yaml"]\n')
+        code, result = self.cli('--check', 'api.yaml')
+        self.assertEqual(code, 2)
+        self.assertEqual(result['submitted_files'], [])
+
+    def test_installer_explicit_full_scope_overrides_project_scope(self):
+        self.policy('scope = "new-findings"\n')
+        for host in ('codex', 'claude'):
+            with self.subTest(host=host):
+                subprocess.run([sys.executable, str(ROOT / 'scripts/install.py'), '--host', host,
+                                '--project', str(self.root), '--feedback-scope', 'changed-files'],
+                               check=True, capture_output=True, text=True)
+                config = self.root / ('.codex/hooks.json' if host == 'codex' else '.claude/settings.json')
+                command = json.loads(config.read_text())['hooks']['PreToolUse'][0]['hooks'][0]['command']
+                self.assertIn('--scope changed-files', command)
+                payload = dict(hook_event_name='PreToolUse', session_id='installed-' + host, cwd=str(self.root))
+                run = subprocess.run(command, shell=True, cwd=self.root, input=json.dumps(payload), capture_output=True, text=True)
+                self.assertEqual(json.loads(run.stdout), {})
+        self.assertFalse(list((self.root / '.git/vale-state').glob('*.baseline')))
+
+    def test_non_git_limit_counts_selected_files(self):
+        import shutil
+        from unittest.mock import patch
+        import prose_lint
+        shutil.rmtree(self.root / '.git')
+        for i in range(4):
+            self.write(f'archive/{i}.md')
+        self.policy('include = ["guide.md"]\n')
+        with patch.object(prose_lint, 'MAX_FILES', 2):
+            self.assertEqual(list(prose_lint.snapshot(self.root)), ['guide.md'])
