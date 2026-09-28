@@ -31,7 +31,7 @@ class ScopeTests(unittest.TestCase):
         self.git('-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '-qm', 'baseline')
 
     def git(self, *args):
-        return subprocess.run(['git', '-C', str(self.root), *args], check=True, capture_output=True, text=True).stdout.strip()
+        return subprocess.run(['git', '-c', 'maintenance.auto=false', '-c', 'gc.auto=0', '-C', str(self.root), *args], check=True, capture_output=True, text=True).stdout.strip()
 
     def cli(self, *args):
         return subprocess.run([sys.executable, str(HOOK), *args], cwd=self.root, capture_output=True, text=True)
@@ -130,7 +130,11 @@ class ScopeTests(unittest.TestCase):
                 self.assertEqual(self.cli(*args).returncode, 2)
 
     def test_non_git_hook_baseline(self):
-        shutil.rmtree(self.root / '.git')
+        directory = tempfile.TemporaryDirectory(prefix='vale nongit ')
+        self.addCleanup(directory.cleanup)
+        self.root = Path(directory.name).resolve()
+        self.file = self.root / 'guide.md'
+        self.file.write_text(OLD)
         self.event('PreToolUse')
         self.file.write_text(NEW)
         self.assertIn('1 new', str(self.event('Stop')))
