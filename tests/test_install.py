@@ -56,3 +56,54 @@ class InstallTests(unittest.TestCase):
         result = self.install('--project', str(self.root))
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual((self.config / 'vale/user-data').read_text(), 'preserve')
+
+    def test_claude_settings_preserved_and_uninstalled(self):
+        config = self.root / '.claude'
+        config.mkdir()
+        settings = config / 'settings.json'
+        original = dict(self.original, permissions={'allow': ['Read']})
+        settings.write_text(json.dumps(original))
+        for _ in range(2):
+            result = self.install('--host', 'claude', '--project', str(self.root))
+            self.assertEqual(result.returncode, 0, result.stderr)
+        current = json.loads(settings.read_text())
+        self.assertEqual(current['permissions'], original['permissions'])
+        self.assertEqual(len(current['hooks']['Stop']), 2)
+        self.assertFalse((config / 'config.toml').exists())
+        sub = self.root / 'docs'
+        sub.mkdir()
+        command = current['hooks']['PreToolUse'][0]['hooks'][0]['command']
+        payload = dict(hook_event_name='PreToolUse', session_id='claude-project', cwd=str(sub))
+        run = subprocess.run(command, shell=True, cwd=sub, input=json.dumps(payload), capture_output=True, text=True)
+        self.assertEqual(run.returncode, 0, run.stderr)
+        self.assertEqual(json.loads(run.stdout), {})
+        result = self.install('--host', 'claude', '--project', str(self.root), '--uninstall')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(settings.read_text()), original)
+
+    def test_claude_user_config_directory(self):
+        config = self.root / 'claude config'
+        result = self.install('--host', 'claude', '--user', env=dict(os.environ, CLAUDE_CONFIG_DIR=str(config)))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        data = json.loads((config / 'settings.json').read_text())
+        self.assertIn('CLAUDE_CONFIG_DIR', data['hooks']['Stop'][0]['hooks'][0]['command'])
+        self.assertTrue((config / 'vale/styles/Google/Latin.yml').is_file())
+
+
+class CommandTests(unittest.TestCase):
+    def test_install_update_remove_and_preserve_existing_command(self):
+        script = INSTALLER.with_name('install_codex_command.py')
+        with tempfile.TemporaryDirectory() as tmp:
+            env = dict(os.environ, CODEX_HOME=tmp)
+            target = Path(tmp) / 'prompts/vale.md'
+            def run(*args):
+                return subprocess.run([sys.executable, str(script), *args], env=env, capture_output=True)
+            self.assertEqual(run().returncode, 0)
+            self.assertIn('check-prose', target.read_text())
+            self.assertEqual(run().returncode, 0)
+            self.assertEqual(run('--uninstall').returncode, 0)
+            self.assertFalse(target.exists())
+            target.write_text('User command')
+            self.assertNotEqual(run().returncode, 0)
+            self.assertNotEqual(run('--uninstall').returncode, 0)
+            self.assertEqual(target.read_text(), 'User command')

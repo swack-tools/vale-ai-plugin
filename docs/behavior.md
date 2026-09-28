@@ -8,6 +8,7 @@
 | `PostToolUse` | Compare file state and check changed files | Findings as additional model context |
 | `Stop` | Check files touched during the session | Request a correction pass if findings remain |
 
+Both clients load the same hook definitions and run the same checker.
 All tool names match. Codex normalizes shell calls to `Bash`, and tools called
 through code mode can also trigger hooks. A background shell command may deliver
 its post-tool event when a later poll observes completion.
@@ -17,7 +18,7 @@ style finding does not hide a shell command's exit status or make a completed
 code-mode tool call reject its promise.
 
 Vale returns JSON on standard output. Findings use `hookSpecificOutput` for
-post-tool context and `decision: block` for a Stop continuation. If Codex sets
+post-tool context and `decision: block` for a Stop continuation. If the client sets
 `stop_hook_active`, Vale reports remaining findings without requesting another
 continuation. This bounds automatic correction to one Stop retry; it is not an
 unconditional completion gate.
@@ -58,18 +59,20 @@ not apply a code formatter or rewrite executable statements.
 
 - The scope is the session's Git root, or its current directory outside Git.
 - Edits outside that root, including a shell command's hidden external working
-  directory, are outside coverage. Start a Codex session in that workspace.
+  directory, are outside coverage. Start an agent session in that workspace.
 - Symlinked files and directories are excluded.
-- Built-in exclusions include `.git`, `.codex`, `.vale`, `.venv`, `node_modules`,
+- Built-in exclusions include `.git`, `.codex`, `.claude`, `.agents`, `.vale`, `.venv`, `node_modules`,
   `target`, `dist`, `build`, `vendor`, and `__pycache__`.
 - Each eligible file must be at most 1 MiB; a workspace can contain at most
   20,000 eligible files. Exceeding a limit reports an incomplete check.
 - Vale receives batches of at most 50 files, with a 20-second timeout per batch.
-  Codex limits each hook to 60 seconds.
+  The plugin limits each hook to 60 seconds.
 - The hook performs no network requests and never runs `vale sync` automatically.
 - Tools that write to remote systems without changing local files cannot be checked.
 
-A tool failure can still change files. The checker examines observed changes
+A tool failure can still change files. Claude Code emits `PostToolUse` only for
+successful tools, so failed-tool changes are caught at the next post-tool event
+or at Stop. The checker examines observed changes
 without assuming that a successful exit is required for an edit.
 
 ## State storage
@@ -80,7 +83,7 @@ Snapshots contain relative file paths and stat metadata, not file contents or
 shell commands. Session IDs are hashed for filenames. Locks and snapshots use
 private file permissions.
 
-To discard old state, close the relevant Codex sessions and remove only the
+To discard old state, close the relevant agent sessions and remove only the
 `vale-state` directory. Restarting a session then establishes a new baseline.
 
 ## Coverage is explicit

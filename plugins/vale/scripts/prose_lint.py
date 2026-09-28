@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check prose changed during a Codex session using local Vale rules."""
+"""Check prose changed during an AI editing session using local Vale rules."""
 from __future__ import annotations
 
 import argparse
@@ -16,7 +16,7 @@ import tempfile
 
 PACKAGE = Path(__file__).resolve().parents[1]
 EXTENSIONS = set('.md .mdx .txt .rst .adoc .html .rs .py .sh .pl .js .jsx .ts .tsx .go .c .h .cpp .hpp .java .css'.split())
-EXCLUDED = {'.git', '.codex', '.venv', 'node_modules', 'target', 'dist', 'build', '.vale', 'vendor', '__pycache__'}
+EXCLUDED = {'.git', '.codex', '.claude', '.agents', '.venv', 'node_modules', 'target', 'dist', 'build', '.vale', 'vendor', '__pycache__'}
 MAX_FILES = 20000
 MAX_BYTES = 1024 * 1024
 EVENTS = {'PreToolUse', 'PostToolUse', 'Stop'}
@@ -147,7 +147,7 @@ def lint(root, names):
         return ''
     vale = shutil.which('vale')
     if not vale:
-        raise RuntimeError('Vale is missing from PATH. Install Vale 3.23 or later, then restart Codex.')
+        raise RuntimeError('Vale is missing from PATH. Install Vale 3.23 or later, then restart your coding agent.')
     paths = []
     for name in sorted(names):
         if not eligible(root, name):

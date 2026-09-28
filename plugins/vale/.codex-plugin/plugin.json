@@ -1,7 +1,7 @@
 {
   "name": "vale",
-  "version": "0.1.0",
-  "description": "Google documentation style checks after Codex edits and before it finishes.",
+  "version": "0.2.0",
+  "description": "Google documentation style checks for Claude Code and Codex.",
   "author": {
     "name": "Swack Tools"
   },
@@ -9,10 +9,13 @@
   "interface": {
     "displayName": "Vale",
     "shortDescription": "Check docs and comments with Vale.",
-    "longDescription": "Check changed prose with bundled Google style rules after tools run and before Codex finishes.",
+    "longDescription": "Check and improve docs and comments with Vale hooks and shared prose skills.",
     "developerName": "Swack Tools",
     "category": "Productivity",
     "capabilities": [],
     "defaultPrompt": "Check the documentation style in the files I changed."
-  }
+  },
+  "homepage": "https://vale.swacktech.com/",
+  "repository": "https://github.com/swack-tools/vale-ai-plugin",
+  "license": "MIT"
 }

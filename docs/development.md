@@ -3,12 +3,16 @@
 ## Repository layout
 
 ```text
-plugins/vale/          Self-contained Codex plugin
+plugins/vale/          Shared Claude Code and Codex plugin
   .codex-plugin/      Codex package metadata
+  .claude-plugin/     Claude Code package metadata
   hooks/              Lifecycle registrations
   scripts/            Python hook runtime
-  skills/             Writing guidance for findings
+  skills/             Checking and writing skills
+  prompts/            Optional Codex slash command
   styles/Google/      Pinned upstream rules and license
+.agents/plugins/      Codex marketplace catalog
+.claude-plugin/       Claude Code marketplace catalog
 scripts/              Installation, verification, and site build tools
 tests/                Runtime and installation tests
 docs/                 Documentation source and static assets
@@ -24,7 +28,10 @@ executable. The documentation build uses the pinned dependency in
 ```sh
 python3 -m unittest discover -s tests -v
 vale --no-global --config plugins/vale/.vale.ini README.md docs plugins/vale/skills
-python3 scripts/codex_smoke.py
+python3 scripts/codex_smoke.py --plugin
+python3 scripts/claude_smoke.py
+claude plugin validate plugins/vale --strict
+claude plugin validate .claude-plugin/marketplace.json --strict
 ```
 
 The unit and integration suite uses temporary directories and real Vale. It
@@ -32,13 +39,18 @@ covers direct edits, shell and MCP changes, concurrent event ordering, ignored
 files, option-like filenames, source comments, Stop retries, and installer
 preservation.
 
-The smoke test drives the installed Codex command-line tool using a deterministic local HTTP
-model fixture. It creates an isolated `CODEX_HOME`, installs project hooks,
-triggers a prose finding, and checks that Codex receives the finding and runs
-a correction after Stop feedback. It uses no remote model or account key.
+The smoke tests install from the local marketplace into temporary client
+configuration and drive the real command-line tools with deterministic local
+HTTP model fixtures. They verify plugin hook discovery, post-tool feedback, and
+a correction after Stop feedback. The Claude Code test also verifies expansion
+of `/vale:check-prose`. No remote model account or key is required.
 
-Only that isolated test invocation bypasses hook trust, after selecting the
-repository's own hook source. Normal installations require `/hooks` review.
+Run `python3 scripts/codex_smoke.py` without `--plugin` to test the manual project
+hook installer. These fixtures test client integration; their scripted replies
+do not evaluate a model's editorial judgment.
+
+Only isolated smoke-test invocations bypass hook trust or tool permissions.
+Normal installations use the client's trust and permission controls.
 
 ## Build the documentation
 

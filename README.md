@@ -1,56 +1,89 @@
-# Vale
+# Vale AI plugin
 
-Vale checks documentation and code comments after Codex tools run and before a
-chat turn finishes. It uses [Vale](https://vale.sh) and bundled Google style rules.
-It works with patches, shell commands, and tools that change local files.
+Check documentation and source comments with [Vale](https://vale.sh) and bundled
+Google style rules in **Claude Code and Codex**. The plugin includes automatic
+hooks, an on-demand checking command, and shared writing and review skills.
 
 ## Install
 
-Requires Python 3.11+, Vale 3.23+, and Codex with lifecycle hooks. Supports macOS,
-Linux, and WSL. Tested with Codex command-line tool 0.158.0 and Vale 3.23.0.
+Requires Python 3.11+, Vale 3.23+, and a client with plugin and lifecycle hook
+support. Supports macOS, Linux, and WSL. On macOS: `brew install python vale`.
 
-```sh
-git clone https://github.com/swack-tools/vale-ai-plugin.git
-cd vale-ai-plugin
+### Claude
 
-# Choose one scope.
-python3 scripts/install.py --project /path/to/project
-python3 scripts/install.py --user
+Run these commands in Claude Code:
+
+```text
+/plugin marketplace add swack-tools/vale-ai-plugin
+/plugin install vale@vale
+/vale:check-prose README.md
 ```
 
-On macOS, install dependencies with `brew install python vale`. On Linux or WSL,
-use the [Vale installation guide](https://vale.sh/docs/install).
+For a shared project installation, use the terminal:
 
-Restart Codex, trust the project if needed, and use `/hooks` to review and trust
-Vale. The installer preserves other hooks and saves a backup before each change.
-To remove Vale, repeat the install command with `--uninstall`.
+```sh
+claude plugin marketplace add swack-tools/vale-ai-plugin --scope project
+claude plugin install vale@vale --scope project
+```
 
-The plugin package is in `plugins/vale`. A central plugin marketplace is optional.
+### Codex
 
-Read the [documentation](https://vale.swacktech.com) for setup, configuration,
-troubleshooting, and contribution instructions.
+Run these commands in your terminal:
 
-## Behavior
+```sh
+codex plugin marketplace add swack-tools/vale-ai-plugin
+codex plugin add vale@vale
+```
 
-- Checks files changed since the first tool call in a session.
-- Uses the project `.vale.ini` when present; otherwise uses bundled Google rules.
-- Sends findings to Codex and requests one correction pass before completion.
-- Leaves files unchanged. Codex applies any corrections.
+Start a new chat, review and trust Vale in `/hooks`, then invoke `$vale:check-prose`
+or select it through `/skills`. For a dedicated slash command, clone this repo
+and run `python3 scripts/install_codex_command.py`; then use
+`/prompts:vale README.md`. This optional command uses Codex's deprecated custom
+prompt support. The shared skill is the preferred Codex interface.
 
-Vale checks automated style rules. It cannot certify every recommendation in the
-Google guide or format Google Docs documents.
+[Installation guide](https://vale.swacktech.com/installation.html) ·
+[Commands, skills, and examples](https://vale.swacktech.com/usage.html) ·
+[Marketplace guide](https://vale.swacktech.com/marketplaces.html)
+
+## Usage
+
+- **Automatic checks:** observe file changes after tools run and before a turn ends.
+- **Review:** `/vale:check-prose README.md review only` in Claude Code, or
+  `$vale:check-prose Review README.md without editing` in Codex.
+- **Write and fix:** use the `google-prose` skill to revise technical prose and
+  verify it with Vale.
+- **Direct checks:** run `python3 plugins/vale/scripts/prose_lint.py --check README.md`.
+
+The checker leaves files unchanged; the agent applies requested corrections.
+A project `.vale.ini` overrides the bundled Google rules. The Stop hook requests
+one correction pass and then reports remaining findings. Vale checks an
+automated subset of the Google style guide; it does not format Google Docs.
+
+## Hooks without a marketplace
+
+Clone this repo, then choose a host and scope:
+
+```sh
+python3 scripts/install.py --host codex --project /path/to/project
+python3 scripts/install.py --host claude --user
+```
+
+Both hosts support `--project` and `--user`. These commands install hooks only.
+They preserve other settings and back up changes. Add `--uninstall` to remove
+Vale. Use one installation method per workspace to avoid duplicate hooks.
 
 ## Development
 
 ```sh
 python3 -m unittest discover -s tests -v
-python3 scripts/codex_smoke.py
+python3 scripts/codex_smoke.py --plugin
+python3 scripts/claude_smoke.py
 ```
 
-The smoke test drives the installed Codex command-line tool with a local deterministic model
-fixture. It requires no account or model API key.
+The smoke tests use the real clients with local model fixtures and temporary
+configuration. No model account or API key is required. See the
+[development guide](https://vale.swacktech.com/development.html) for details.
 
-GitHub Actions checks pull requests. It deploys documentation to GitHub Pages
-only after a push to `main`, including a pull request merge.
-
-MIT license. Bundled Google rules retain their upstream license.
+GitHub Actions checks pull requests and deploys the documentation only on pushes
+to `main`, including pull request merges. MIT license; bundled Google rules
+retain their upstream license.
