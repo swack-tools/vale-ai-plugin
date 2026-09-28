@@ -12,7 +12,7 @@ import tempfile
 SOURCE = Path(__file__).resolve().parents[1] / 'plugins/vale'
 MARKER = '# vale-hook'
 OWNERSHIP = '.vale-install.json'
-PROJECT_COMMAND = "python3 -c 'from pathlib import Path; import subprocess, sys; p=Path.cwd().resolve(); f=next(r/\".codex/vale/scripts/prose_lint.py\" for r in (p,*p.parents) if (r/\".codex/vale/scripts/prose_lint.py\").is_file()); sys.exit(subprocess.call([sys.executable,str(f)]))' # vale-hook"
+PROJECT_COMMAND = "python3 -c 'from pathlib import Path; import subprocess, sys; p=Path.cwd().resolve(); f=next(r/\".codex/vale/scripts/prose_lint.py\" for r in (p,*p.parents) if (r/\".codex/vale/scripts/prose_lint.py\").is_file()); sys.exit(subprocess.call([sys.executable,str(f),*sys.argv[1:]]))' # vale-hook"
 USER_COMMAND = 'python3 "${CODEX_HOME:-$HOME/.codex}/vale/scripts/prose_lint.py" # vale-hook'
 
 
@@ -33,7 +33,7 @@ def atomic_json(path, data):
             os.unlink(temp)
 
 
-def install(config, user, uninstall, host="codex"):
+def install(config, user, uninstall, host="codex", feedback_scope="changed-files"):
     destination = config / 'vale'
     hooks_file = config / ('settings.json' if host == 'claude' else 'hooks.json')
     if config.is_symlink() or destination.is_symlink() or hooks_file.is_symlink():
@@ -61,7 +61,7 @@ def install(config, user, uninstall, host="codex"):
         staging = Path(tempfile.mkdtemp(prefix='.vale-install-', dir=config))
         try:
             shutil.copytree(SOURCE, staging, dirs_exist_ok=True, ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
-            (staging / OWNERSHIP).write_text(json.dumps({'package': 'vale', 'version': '0.2.0'}) + '\n')
+            (staging / OWNERSHIP).write_text(json.dumps({'package': 'vale', 'version': '0.3.0'}) + '\n')
             # Remove only files from our previous installed package; backups remain.
             if destination.exists():
                 shutil.rmtree(destination)
@@ -73,6 +73,8 @@ def install(config, user, uninstall, host="codex"):
         if host == "claude":
             command = ('python3 "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/vale/scripts/prose_lint.py" # vale-hook'
                        if user else PROJECT_COMMAND.replace(".codex/vale", ".claude/vale"))
+        if feedback_scope == 'new-findings':
+            command = command.removesuffix(MARKER) + '--scope new-findings ' + MARKER
         for event in ('PreToolUse', 'PostToolUse', 'Stop'):
             hooks.setdefault(event, []).append({'hooks': [{'type': 'command', 'command': command,
                                                          'timeout': 60, 'statusMessage': 'Checking documentation style'}]})
@@ -101,13 +103,15 @@ def main():
     scope.add_argument('--user', action='store_true')
     parser.add_argument('--uninstall', action='store_true')
     parser.add_argument('--host', choices=('codex', 'claude'), default='codex')
+    parser.add_argument('--feedback-scope', choices=('changed-files', 'new-findings'), default='changed-files',
+                        help='Select hook feedback. Reapply this option when updating an opt-in installation.')
     args = parser.parse_args()
     directory = '.claude' if args.host == 'claude' else '.codex'
     home_variable = 'CLAUDE_CONFIG_DIR' if args.host == 'claude' else 'CODEX_HOME'
     config = (Path(os.environ.get(home_variable, str(Path.home() / directory))).expanduser()
               if args.user else args.project.expanduser().resolve() / directory)
     try:
-        install(config, args.user, args.uninstall, args.host)
+        install(config, args.user, args.uninstall, args.host, args.feedback_scope)
     except (OSError, ValueError, TypeError) as error:
         print(f'Vale installation failed: {error}', file=sys.stderr)
         return 1

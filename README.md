@@ -7,7 +7,7 @@ hooks, an on-demand checking command, and shared writing and review skills.
 ## Install
 
 Requires Python 3.11+, Vale 3.23+, and a client with plugin and lifecycle hook
-support. Supports macOS, Linux, and WSL. On macOS: `brew install python vale`.
+support. Supports macOS, Linux, and Windows Subsystem for Linux. On macOS: `brew install python vale`.
 
 ### Claude
 
@@ -36,9 +36,9 @@ codex plugin add vale@vale
 ```
 
 Start a new chat, review and trust Vale in `/hooks`, then invoke `$vale:check-prose`
-or select it through the `/skills` slash command. Codex 0.158.0 does not support
-custom `/prompts:vale` commands. A legacy prompt template and installer are
-included only for older clients that retain custom prompt support. See the
+or select it through the `/skills` slash command. Codex 0.158.0 doesn't support
+custom `/prompts:vale` commands. The repository includes a legacy prompt template and installer only for older
+clients that retain custom prompt support. See the
 installation guide for that compatibility path.
 
 [Installation guide](https://vale.swacktech.com/installation.html) ·
@@ -52,12 +52,20 @@ installation guide for that compatibility path.
   `$vale:check-prose Review README.md without editing` in Codex.
 - **Write and fix:** use the `google-prose` skill to revise technical prose and
   verify it with Vale.
+- **Audit scope:** use `--all` for every eligible workspace file, or
+  `--check FILE --scope new-findings --base-ref main` for conservative comparison.
 - **Direct checks:** run `python3 plugins/vale/scripts/prose_lint.py --check README.md`.
 
-The checker leaves files unchanged; the agent applies requested corrections.
+The checker leaves files unchanged. The agent applies requested corrections.
 A project `.vale.ini` overrides the bundled Google rules. The Stop hook requests
 one correction pass and then reports remaining findings. Vale checks an
-automated subset of the Google style guide; it does not format Google Docs.
+automated subset of the Google style guide. It doesn't format Google Docs.
+
+Automatic new-findings feedback is opt-in through the installer’s
+`--feedback-scope new-findings` option. It retains initial source text locally
+and falls back to full-file feedback when comparison is uncertain. See the
+[scope and privacy details](https://vale.swacktech.com/behavior.html#initial-document-baselines)
+and the [feature guide](https://vale.swacktech.com/features.html).
 
 ## Hooks without a marketplace
 
@@ -81,11 +89,11 @@ python3 scripts/claude_smoke.py
 ```
 
 The smoke tests use the real clients with local model fixtures and temporary
-configuration. No model account or API key is required. See the
+configuration. The fixtures need no model account or API key. See the
 [development guide](https://vale.swacktech.com/development.html) for details.
 
 GitHub Actions checks pull requests and deploys the documentation only on pushes
-to `main`, including pull request merges. MIT license; bundled Google rules
+to `main`, including pull request merges. See the [license](LICENSE). Bundled Google rules
 retain their upstream license.
 
 ## Diagnostics

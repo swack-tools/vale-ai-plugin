@@ -93,11 +93,18 @@ def run_process(args, *, cwd=None, input=None, deadline=None, timeout=20, max_ou
     finally:
         # Even an exited parent can leave a parser descendant holding a pipe.
         try:
-            os.killpg(proc.pid, signal.SIGKILL)
-        except ProcessLookupError:
-            # The process group has already exited; no descendants need killing.
-            pass
-        for stream in (proc.stdin, proc.stdout, proc.stderr):
-            stream.close()
-        selector.close()
-        proc.wait(timeout=1)
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                # The process group has already exited; no descendants need killing.
+                pass
+            except PermissionError:
+                # macOS can return EPERM for an exited group. Only accept it
+                # after reaping our child; a running child's failure stays visible.
+                if proc.poll() is None:
+                    raise
+        finally:
+            for stream in (proc.stdin, proc.stdout, proc.stderr):
+                stream.close()
+            selector.close()
+            proc.wait(timeout=1)

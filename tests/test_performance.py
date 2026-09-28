@@ -236,6 +236,13 @@ class PerformanceTests(unittest.TestCase):
         self.assertNotIn('ignored/guide.md', context)
         self.assertEqual(self.state.read_bytes(), before)
 
+    def test_exited_process_group_permission_error_does_not_mask_result(self):
+        module = self.deadline_module()
+        with patch.object(module.os, 'killpg', side_effect=PermissionError('group already exited')):
+            result = module.run_process([sys.executable, '-c', 'print("finished")'])
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.stdout.strip(), 'finished')
+
     def test_output_limit_is_enforced(self):
         module = self.deadline_module()
         with self.assertRaises(RuntimeError):

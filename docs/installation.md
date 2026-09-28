@@ -3,11 +3,11 @@
 ## Requirements
 
 Install Python 3.11+, Vale 3.23+, and Claude Code or Codex with plugin and
-lifecycle hook support. The runtime supports macOS, Linux, and WSL. Native
-Windows is not supported because state locking uses `fcntl`.
+lifecycle hook support. The runtime supports macOS, Linux, and Windows Subsystem for Linux. Native
+Windows isn't supported because state locking uses `fcntl`.
 
 Tested with Codex 0.158.0, Claude Code 2.1.277, and Vale 3.23.0. Hooks run on the
-machine that holds the workspace; install Python and Vale there.
+machine that holds the workspace. Install Python and Vale there.
 
 ```sh
 # macOS
@@ -23,8 +23,8 @@ only if your project uses the corresponding markup format:
 
 | Format | Package | Required command |
 | --- | --- | --- |
-| reStructuredText (`.rst`) | Python Docutils | `rst2html` |
-| AsciiDoc (`.adoc`) | Ruby Asciidoctor | `asciidoctor` |
+| reStructuredText: `.rst` | Python Docutils | `rst2html` |
+| AsciiDoc: `.adoc` | Ruby Asciidoctor | `asciidoctor` |
 
 Install Docutils in a Python environment available to the agent:
 
@@ -44,9 +44,9 @@ asciidoctor --version
 
 Ensure the agent's process inherits the parser commands on `PATH`. Restart the
 agent after changing its environment. A missing parser prevents that format's
-check from completing; it does not mean the document has no findings.
+check from completing. It doesn't mean the document has no findings.
 
-For Linux and WSL, use the [Vale installation guide](https://vale.sh/docs/install).
+For Linux and Windows Subsystem for Linux, use the [Vale installation guide](https://vale.sh/docs/install).
 Vale needs no account or API key. Review the package scripts before enabling
 hooks. Choose one installation method per workspace to avoid duplicate feedback.
 
@@ -92,12 +92,12 @@ project configuration when prompted. If hooks are off, start Codex with
 `codex --enable hooks`.
 
 Invoke `$vale:check-prose` or `$vale:google-prose`, or select the skill through `/skills`.
-The plugin installation is managed through your Codex user configuration.
+Codex manages the plugin installation through your user configuration.
 For a portable project hook installation, use the installer below.
 
 ### Legacy slash command compatibility
 
-Codex 0.158.0 does not recognize `/prompts:vale`. Use the `/skills` slash command
+Codex 0.158.0 doesn't recognize `/prompts:vale`. Use the `/skills` slash command
 and select `vale:check-prose`, or mention `$vale:check-prose` directly.
 
 For older clients that still support deprecated custom prompts, this repository
@@ -114,12 +114,12 @@ On a compatible legacy client, start a new chat and run
 invokes the installed plugin's checking skill. Install the Codex plugin first.
 The installer writes `$CODEX_HOME/prompts/vale.md`, or
 `~/.codex/prompts/vale.md`, and refuses to replace an unrelated command.
-The template is not a supported command on the tested Codex 0.158.0 runtime.
-Custom prompts are user-scoped; they do not travel with a project checkout.
+The template isn't a supported command on the tested Codex 0.158.0 runtime.
+Custom prompts are user-scoped. They don't travel with a project checkout.
 
 ## Project or user hooks without a marketplace
 
-Clone the package if you have not already done so:
+Clone the package if you haven't already done so:
 
 ```sh
 git clone https://github.com/swack-tools/vale-ai-plugin.git
@@ -148,10 +148,10 @@ The installer preserves other hooks and settings and backs up the configuration
 before each update. For Codex it creates `config.toml` only if the file is
 missing. Project commands resolve their runtime from the current directory or
 an ancestor, so they work after moving the checkout and from subdirectories.
-The copied runtime does not depend on the original clone.
+The copied runtime doesn't depend on the original clone.
 
-Commit the installed runtime and configuration to share project hooks. Do not
-commit backup files. Restart your client and review `/hooks`; Codex requires
+Commit the installed runtime and configuration to share project hooks. Don't
+commit backup files. Restart your client and review `/hooks`. Codex requires
 explicit trust for new or changed hook definitions.
 
 ## Verify your setup
@@ -172,7 +172,7 @@ python3 .codex/vale/scripts/prose_lint.py --check README.md
 python3 .claude/vale/scripts/prose_lint.py --check README.md
 ```
 
-For plugin installations, use the checking skill; it resolves the installed
+For plugin installations, use the checking skill. It resolves the installed
 runtime path. See [usage examples](usage.html).
 
 ## Update or remove
@@ -189,5 +189,41 @@ python3 scripts/install.py --host codex --user --uninstall
 python3 scripts/install_codex_command.py --uninstall
 ```
 
-Removal preserves unrelated configuration and backups. Session state remains;
-see [state storage](behavior.html#state-storage) for cleanup instructions.
+Removal preserves unrelated configuration and backups. Session state remains.
+See [state storage](behavior.html#state-storage) for cleanup instructions.
+
+## Enable automatic new-findings feedback
+
+Marketplace hooks keep the default full-file feedback for changed files.
+For automatic comparison, use a hook-only installation and select its feedback
+scope explicitly:
+
+```sh
+python3 scripts/install.py --host codex --project /path/to/project --feedback-scope new-findings
+python3 scripts/install.py --host claude --user --feedback-scope new-findings
+```
+
+Both hosts support this option for both project and user installations. Choose
+one command and avoid duplicate marketplace hooks. The installer adds
+`--scope new-findings` to all three event commands and preserves its ownership
+marker. It also forwards the option through portable project launchers.
+
+Restart the client and trust the updated hooks. A fresh session captures the
+initial documents before editing. Read the [source-text retention and limits](behavior.html#initial-document-baselines)
+before enabling this mode. It's most useful with the bundled Google policy.
+Custom project policies keep full-file feedback.
+
+Repeat `--feedback-scope new-findings` when updating this installation. Omitting
+it restores `changed-files`. To restore the default explicitly, repeat the
+installer with `--feedback-scope changed-files`. Changing scope during an active
+session doesn't reconstruct its original source text. Start a new session.
+
+For a locally maintained plugin package, the equivalent hook command is:
+
+```sh
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/prose_lint.py" --scope new-findings
+```
+
+Apply it to `PreToolUse`, `PostToolUse`, and `Stop`. Keep local package changes
+under your own version control. A marketplace update can replace them.
+Manual skill comparisons work independently of the automatic hook scope.

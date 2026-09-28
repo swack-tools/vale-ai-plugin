@@ -36,7 +36,7 @@ multiple sources, which can duplicate feedback.
 2. **Check.** After tools finish, run Vale on files whose state changed.
 3. **Finish.** Before the agent stops, check files touched during the session.
 
-Shell scripts, patches, editors, and MCP tools can all change local files. Vale
+Shell scripts, patches, editors, and Model Context Protocol tools can all change local files. Vale
 observes the result without guessing what a shell command does.
 
 ## A focused checker
@@ -46,7 +46,7 @@ errors and disables spelling checks. Source files use Vale's syntax support to
 check prose comments. Markdown code blocks remain code.
 
 Vale leaves files unchanged and gives the agent findings to resolve. It checks
-an automated subset of the Google style guide and does not format Google Docs.
+an automated subset of the Google style guide and doesn't format Google Docs.
 An existing project `.vale.ini` takes precedence over the bundled configuration.
 
 ## Explore the documentation

@@ -3,18 +3,18 @@
 ## Defaults
 
 If a project has no `.vale.ini`, the checker uses the bundled configuration and
-Google rules. The rules are pinned to Google v0.7.1. Spelling is off,
+Google rules. The bundle uses Google v0.7.1. Spelling is off,
 and the minimum alert level is `warning`.
 
-The checker runs with `--no-global`, so another global Vale configuration cannot
+The checker runs with `--no-global`, so another global Vale configuration can't
 silently change the result.
 
 ## Project configuration
 
 A `.vale.ini` at the workspace root replaces the bundled configuration. This
 preserves a project's existing policy, including any rules turned off. A custom
-configuration can weaken or remove Google checks; include Google explicitly if
-that is your project's requirement.
+configuration can weaken or remove Google checks. Include Google explicitly if
+that's your project's requirement.
 
 For a manual Codex project installation, this configuration uses the installed rules:
 
@@ -42,7 +42,7 @@ Vale.Spelling = NO
 
 Run `vale sync` from the project root to download that configuration's packages.
 Commit the configuration and add downloaded package directories to `.gitignore`.
-Vale does not run package synchronization during a hook.
+Vale doesn't run package synchronization during a hook.
 
 The configuration filename is `.vale.ini`.
 
@@ -76,8 +76,8 @@ identifiers, and technical meaning intact.
 ## Generated files
 
 Keep generated output in an excluded directory or use Vale's file-specific
-configuration to turn off checks for the generated files. Vale does not guess
-whether a file is generated from arbitrary text in its header.
+configuration to turn off checks for the generated files. Vale doesn't guess
+whether a generator created a file from arbitrary text in its header.
 
 For example, a project configuration can turn off checks for a generated
 Markdown file:

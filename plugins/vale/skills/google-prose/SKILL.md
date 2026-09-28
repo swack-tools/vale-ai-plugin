@@ -23,12 +23,12 @@ python3 /path/to/vale/scripts/prose_lint.py --check docs/example.md
 ```
 
 Resolve `../../scripts/prose_lint.py` relative to this skill's directory and use
-its absolute path. Run from the user's workspace. Do not assume plugin
+its absolute path. Run from the user's workspace. Don't assume plugin
 environment variables exist in shell tools. A project `.vale.ini` overrides the bundled
-policy. Do not turn off a rule or weaken that policy merely to pass a check.
+policy. Don't turn off a rule or weaken that policy merely to pass a check.
 If a finding needs an editorial exception, explain it and follow the user's
 project conventions.
 
-The checker does not certify the entire Google style guide. Report unresolved
-findings or an unavailable checker explicitly. Do not format Google Docs files
+The checker doesn't certify the entire Google style guide. Report unresolved
+findings or an unavailable checker explicitly. Don't format Google Docs files
 or apply a source-code formatter as part of this skill.

@@ -12,6 +12,7 @@ EXTENSIONS = set('.md .mdx .txt .rst .adoc .html .rs .py .sh .pl .js .jsx .ts .t
 EXCLUDED = {'.git', '.codex', '.claude', '.agents', '.venv', 'node_modules', 'target', 'dist', 'build', '.vale', 'vendor', '__pycache__'}
 MAX_FILES = 20000
 MAX_BYTES = 1024 * 1024
+MAX_DOCUMENT_BYTES = 16 * 1024 * 1024
 
 
 def path_issue(root, name):
@@ -88,7 +89,7 @@ def decode_alert(alert, path):
                    alert['Severity'], alert['Message'], alert['Match'], link, suggestions, action)
 
 
-def run_check(root, names, *, deadline=None):
+def run_check(root, names, *, deadline=None, documents=None):
     deadline = deadline or Deadline(50)
     result = empty_result(root, names)
     if not names:
@@ -105,7 +106,7 @@ def run_check(root, names, *, deadline=None):
             if path.stat().st_size > MAX_BYTES:
                 result.errors.append(Issue('file_limit', f'{name} exceeds the 1 MiB file limit; exclude or split it before checking.', name))
                 continue
-            if result.coverage.source == 'bundled' and path.suffix != path.suffix.lower():
+            if documents is not None or (result.coverage.source == 'bundled' and path.suffix != path.suffix.lower()):
                 aliases.append((name, path))
             else:
                 paths.append((name, path))
@@ -121,7 +122,33 @@ def run_check(root, names, *, deadline=None):
         result.errors.append(Issue('missing_vale', 'Vale is missing from PATH. Install Vale 3.23 or later, then restart your coding agent.'))
         return result.finish()
     jobs = [(paths[i:i+50], None) for i in range(0, len(paths), 50)]
-    jobs += [([pair], str(pair[1].with_suffix(pair[1].suffix.lower()))) for pair in aliases]
+    jobs += [([pair], str(pair[1].with_suffix(pair[1].suffix.lower())) if result.coverage.source == 'bundled' else str(pair[1])) for pair in aliases]
+    return _execute(root, result, jobs, deadline, vale, captured=documents)
+
+
+def check_document(root, text, logical_path, *, deadline=None):
+    """Lint complete in-memory text with the same decoder and configuration."""
+    deadline = deadline or Deadline(50)
+    name = str(logical_path)
+    result = empty_result(root, [name])
+    path = root / name
+    if (not path.is_absolute() or not path.is_relative_to(root) or '..' in path.parts or
+            path.suffix.lower() not in EXTENSIONS or set(Path(name).parts) & EXCLUDED or
+            path.is_symlink() or any(p.is_symlink() for p in path.parents)):
+        result.errors.append(Issue('unsupported_path', 'Invalid logical document path.', name))
+    elif len(text.encode('utf-8')) > MAX_BYTES:
+        result.errors.append(Issue('file_limit', 'Document exceeds the 1 MiB file limit.', name))
+    vale = shutil.which('vale')
+    if not vale:
+        result.errors.append(Issue('missing_vale', 'Vale is missing from PATH.'))
+    if result.errors:
+        return result.finish()
+    logical = str(path.with_suffix(path.suffix.lower())) if result.coverage.source == 'bundled' else str(path)
+    return _execute(root, result, [([(name, path)], logical)], deadline, vale, document=text)
+
+
+def _execute(root, result, jobs, deadline, vale, *, document=None, captured=None):
+    captured_bytes = 0
     for batch, logical in jobs:
         command = [vale, '--no-global', '--config', result.config_path, '--output=JSON']
         mapping = {str(path): str(path) for name, path in batch}
@@ -130,8 +157,21 @@ def run_check(root, names, *, deadline=None):
             content = None
             if logical:
                 path = batch[0][1]
-                command += ['--ext=' + path.suffix.lower(), '--path=' + logical]
-                content = path.read_text(encoding='utf-8')
+                command += ['--ext=' + Path(logical).suffix, '--path=' + logical]
+                if document is None:
+                    with path.open('rb') as source:
+                        raw = source.read(MAX_BYTES + 1)
+                    if len(raw) > MAX_BYTES:
+                        raise ValueError('Document exceeds the 1 MiB file limit.')
+                    content = raw.decode('utf-8')
+                else:
+                    content = document
+                if captured is not None:
+                    size = len(content.encode('utf-8'))
+                    retained = captured_bytes + size <= MAX_DOCUMENT_BYTES
+                    captured[batch[0][0]] = content if retained else None
+                    if retained:
+                        captured_bytes += size
                 mapping = {logical: str(path)}
             else:
                 command += ['--', *(str(path) for name, path in batch)]
