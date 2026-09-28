@@ -9,7 +9,7 @@ plugins/vale/          Shared Claude Code and Codex plugin
   hooks/              Lifecycle registrations
   scripts/            Python hook runtime
   skills/             Checking and writing skills
-  prompts/            Optional Codex slash command
+  prompts/            Legacy Codex prompt template
   styles/Google/      Pinned upstream rules and license
 .agents/plugins/      Codex marketplace catalog
 .claude-plugin/       Claude Code marketplace catalog
