@@ -112,12 +112,19 @@ def literal_count(source, text, literal):
     code = '`' + literal + '`'
     if code in source:
         pattern = r'(?<!`)' + re.escape(code) + r'(?!`)'
-        # Freeze the source tail rather than guessing which shell or markup
-        # forms can extend a command. Semantic review still checks context.
-        tails = {source[match.end():].split('\n', 1)[0] for match in re.finditer(pattern, source)}
+        # Preserve literal context rather than guessing shell/markup syntax.
+        # Moving the span to the start of a line permits surrounding prose edits.
+        def context(document, match):
+            prefix = document[document.rfind('\n', 0, match.start()) + 1:match.start()]
+            tail = document[match.end():].split('\n', 1)[0]
+            return prefix, tail
+        contexts = {context(source, match) for match in re.finditer(pattern, source)}
+        tails = {tail for _, tail in contexts}
         spans = list(re.finditer(pattern, text))
-        if any(text[match.end():].split('\n', 1)[0] not in tails for match in spans):
-            return 0
+        for match in spans:
+            prefix, tail = context(text, match)
+            if (prefix, tail) not in contexts and not (not prefix.strip() and tail in tails):
+                return 0
         return len(spans)
     # Remaining labels are words, identifiers, phrases, or already quoted units.
     # Apostrophes belong to a word: "mustn't" does not preserve "must".

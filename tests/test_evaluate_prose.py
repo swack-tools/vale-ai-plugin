@@ -286,10 +286,10 @@ class EvaluationTests(unittest.TestCase):
                 trial['reviewed_output_sha256'] = hashlib.sha256(path.read_bytes()).hexdigest()
                 self.assertEqual(self.run_validator()[0], 1)
 
-    def test_protected_code_allows_prose_edits_before_it(self):
+    def test_protected_code_allows_prose_edits_on_separate_line(self):
         trial = self.trials[0]
         path = self.root / trial['output_file']
-        path.write_text(path.read_text().replace('We install the package with', 'Install the package with'))
+        path.write_text(path.read_text().replace('We install the package with ', 'Install the package with this command:\n'))
         trial['reviewed_output_sha256'] = hashlib.sha256(path.read_bytes()).hexdigest()
         self.assertEqual(self.run_validator()[0], 0)
 
@@ -302,3 +302,14 @@ class EvaluationTests(unittest.TestCase):
                 self.assertEqual(run.returncode, 2, run.stderr)
                 self.assertFalse(run.stderr)
                 self.assertEqual(json.loads(run.stdout)['status'], 'incomplete')
+
+    def test_execution_prefixes_change_the_command(self):
+        trial = self.trials[0]
+        path = self.root / trial['output_file']
+        original = path.read_bytes()
+        for prefix in ('sudo ', 'env DEBUG=1 ', 'sh -c ', 'echo x && ',
+                       '**sudo** ', 'arbitrary-wrapper ', '$(prepare) '):
+            with self.subTest(prefix=prefix):
+                path.write_text(original.decode().replace('`tool install --version 2.0`', prefix + '`tool install --version 2.0`'))
+                trial['reviewed_output_sha256'] = hashlib.sha256(path.read_bytes()).hexdigest()
+                self.assertEqual(self.run_validator()[0], 1)

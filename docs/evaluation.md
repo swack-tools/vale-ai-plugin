@@ -153,11 +153,13 @@ explanation in the notes. Any unreviewed dimension makes the overall verdict
 Protected-literal checks compare exact occurrence counts against the original
 input and flag missing or added occurrences. Labels inside inline code protect
 the complete code span. Labels that occupy a whole source line protect that
-line. Text after a protected inline code span must match the rest of its original
-source line exactly. This rule catches added options, positional arguments,
-pipes, and redirections, including additions that use markup. It also flags
-harmless edits to that trailing prose. You can edit prose before the span.
-Keep its trailing text intact. Other word and identifier labels use word
+line. Text before and after a protected inline code span must match its
+original source line exactly. You can also move the span to the start of a
+line and retain its original trailing text. This rule catches added command
+prefixes, options, positional arguments, pipes, and redirections, including
+additions that use markup. It also flags harmless edits to surrounding prose.
+To edit that prose, put it on a separate line from the protected span.
+Other word and identifier labels use word
 boundaries, so an extended identifier can't pass as an unchanged prefix.
 This conservative check also flags code-format changes that remove the
 original delimiters or line layout. Keep that formatting intact during a trial.
