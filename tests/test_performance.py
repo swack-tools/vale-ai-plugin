@@ -92,8 +92,9 @@ class PerformanceTests(unittest.TestCase):
     def test_cli_discovery_failure_is_structured(self):
         import io
         from contextlib import redirect_stdout
+        deadline_module = self.deadline_module()
         for mode in (['--check', 'guide.md'], ['--doctor']):
-            with self.subTest(mode=mode), patch.object(sys, 'argv', ['prose_lint', '--format', 'json', *mode]), patch.object(hook, 'workspace', side_effect=hook.DeadlineExceeded('discovery timed out')):
+            with self.subTest(mode=mode), patch.object(sys, 'argv', ['prose_lint', '--format', 'json', *mode]), patch.object(hook, 'workspace', side_effect=deadline_module.DeadlineExceeded('discovery timed out')):
                 output = io.StringIO()
                 with redirect_stdout(output):
                     code = hook.main()
