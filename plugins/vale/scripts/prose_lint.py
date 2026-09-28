@@ -17,12 +17,18 @@ import time
 from deadline import Deadline, run_process
 
 from lint_result import Issue, render_text
-from vale_runner import EXTENSIONS, EXCLUDED, MAX_FILES, eligible, empty_result, run_check
-# Preserve helper imports used by existing callers of the original single module.
 import vale_runner
+
+# Preserve helper names used by existing callers of the original single module.
 PACKAGE = vale_runner.PACKAGE
+EXTENSIONS = vale_runner.EXTENSIONS
+EXCLUDED = vale_runner.EXCLUDED
+MAX_FILES = vale_runner.MAX_FILES
 MAX_BYTES = vale_runner.MAX_BYTES
+eligible = vale_runner.eligible
 configuration = vale_runner.configuration
+empty_result = vale_runner.empty_result
+run_check = vale_runner.run_check
 
 EVENTS = {'PreToolUse', 'PostToolUse', 'Stop'}
 
