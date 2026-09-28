@@ -6,7 +6,7 @@ import subprocess
 
 from deadline import Deadline, DeadlineExceeded, run_process
 from lint_result import CheckResult, Coverage, Finding, Issue
-from policy import EXTENSIONS, EXCLUDED, EffectivePolicy, load_policy
+from policy import EffectivePolicy, load_policy
 
 PACKAGE = Path(__file__).resolve().parents[1]
 MAX_FILES = 20000

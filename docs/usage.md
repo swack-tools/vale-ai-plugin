@@ -167,7 +167,8 @@ an incomplete check. Prefix a reference that starts with a hyphen using the
 argument form `--base-ref=VALUE`.
 
 Manual new-findings mode requires both `--check FILE...` and `--base-ref REV`.
-It rejects `--all` and `--doctor`. The default scope rejects `--base-ref`.
+It rejects `--all`. Doctor accepts a scope option to show its effective value
+and origin without running comparison. The default scope rejects `--base-ref`.
 A full audit remains available through `--all` or `--check FILE --scope changed-files`.
 A project-selected `new-findings` scope also requires `--base-ref` for manual
 file checks. `--all` always performs a full audit, and `--doctor` reports the

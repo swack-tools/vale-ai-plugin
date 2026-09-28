@@ -6,8 +6,8 @@ import shutil
 import subprocess
 import time
 
-from vale_runner import EXTENSIONS, empty_result
-from policy import load_policy
+from vale_runner import empty_result
+from policy import EXTENSIONS, load_policy
 
 
 def empty_diagnostics(root):

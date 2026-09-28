@@ -233,7 +233,7 @@ include = ["*.prose", "*.MD"]
 The `.prose` fixture reports prose findings at their original locations and
 skips fenced code. `MD = md` provides the same parser behavior for uppercase
 Markdown names. Add an alias for each additional case spelling you use.
-a filename glob alone doesn't select the correct parser. The wrapper accepts
+A filename glob alone doesn't select the correct parser. The wrapper accepts
 aliases only to its supported formats and retains project coverage as unknown.
 It doesn't modify project `.vale.ini` files.
 

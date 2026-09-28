@@ -254,3 +254,11 @@ class PolicyTests(unittest.TestCase):
         self.policy('include = ["guide.md"]\n')
         with patch.object(prose_lint, 'MAX_FILES', 2):
             self.assertEqual(list(prose_lint.snapshot(self.root)), ['guide.md'])
+
+    def test_doctor_reports_explicit_comparison_scope(self):
+        self.policy('scope = "changed-files"\n')
+        code, result = self.cli('--doctor', '--scope', 'new-findings')
+        self.assertEqual(code, 0)
+        self.assertEqual(result['policy']['scope'], 'new-findings')
+        self.assertEqual(result['policy']['origins']['scope'], 'cli')
+        self.assertFalse((self.root / '.git/vale-state').exists())

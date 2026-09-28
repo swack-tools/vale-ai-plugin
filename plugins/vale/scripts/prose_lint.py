@@ -18,12 +18,13 @@ from deadline import Deadline, OutputLimitExceeded, run_process
 
 from lint_result import Issue, render_text
 import vale_runner
+import policy as selection_policy
 from policy import HARD_EXCLUDED, load_policy
 
 # Preserve helper names used by existing callers of the original single module.
 PACKAGE = vale_runner.PACKAGE
-EXTENSIONS = vale_runner.EXTENSIONS
-EXCLUDED = vale_runner.EXCLUDED
+EXTENSIONS = selection_policy.EXTENSIONS
+EXCLUDED = selection_policy.EXCLUDED
 MAX_FILES = vale_runner.MAX_FILES
 MAX_BYTES = vale_runner.MAX_BYTES
 eligible = vale_runner.eligible
@@ -319,8 +320,8 @@ def main():
     overrides = {key: getattr(args, key) for key in ('scope', 'include', 'exclude', 'profile')}
     if args.base_ref is not None and (not args.check or args.scope == 'changed-files'):
         parser.error('--base-ref requires --check and --scope new-findings.')
-    if args.scope == 'new-findings' and (args.all or args.doctor or (args.check and args.base_ref is None)):
-        parser.error('Manual new-findings requires --check FILE... --base-ref REV; --all and --doctor do not compare.')
+    if args.scope == 'new-findings' and (args.all or (args.check and args.base_ref is None)):
+        parser.error('Manual new-findings requires --check FILE... --base-ref REV; --all does not compare.')
     if args.check or args.all or args.doctor:
         root = Path.cwd()
         try:
