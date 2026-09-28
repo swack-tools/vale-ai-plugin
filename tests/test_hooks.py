@@ -33,6 +33,73 @@ class HookTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         return json.loads(result.stdout)
 
+    def check_file(self, name):
+        return subprocess.run([sys.executable, str(HOOK), '--check', name],
+                              cwd=self.root, capture_output=True, text=True)
+
+    def test_bundled_aliases_cover_all_supported_case_variants(self):
+        import configparser
+        import itertools
+        config = configparser.ConfigParser(interpolation=None)
+        config.optionxform = str
+        config.read_string('[global]\n' + (ROOT / 'plugins/vale/.vale.ini').read_text())
+        for ext in 'md mdx txt rst adoc html rs py sh pl js jsx ts tsx go c h cpp hpp java css'.split():
+            for letters in itertools.product(*[(c, c.upper()) for c in ext]):
+                alias = ''.join(letters)
+                if alias != ext:
+                    self.assertEqual(config.get('formats', alias, fallback=None), ext)
+
+    def test_case_variants_preserve_markdown_syntax(self):
+        for ext in ('md', 'MD', 'Md', 'mD'):
+            with self.subTest(ext=ext):
+                path = self.root / ('case.' + ext)
+                path.write_text(BAD + '\n```text\n' + BAD + '```\n')
+                result = self.check_file(path.name)
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                self.assertIn('Google.Latin', result.stdout)
+                self.assertNotIn(str(path) + ':4:', result.stdout)
+                path.unlink()
+
+    def test_case_variants_preserve_source_comments(self):
+        for ext in ('py', 'PY', 'Py', 'pY'):
+            with self.subTest(ext=ext):
+                path = self.root / ('case.' + ext)
+                path.write_text('# ' + BAD + 'value = "' + BAD.strip() + '"\n')
+                result = self.check_file(path.name)
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                self.assertIn('Google.Latin', result.stdout)
+                self.assertNotIn(str(path) + ':2:', result.stdout)
+                path.unlink()
+
+    def test_project_config_is_not_augmented(self):
+        (self.root / '.vale.ini').write_text('[*.md]\nBasedOnStyles = Vale\nVale.Spelling = NO\n')
+        self.file.write_text(BAD)
+        self.assertEqual(self.check_file(self.file.name).returncode, 0)
+
+    def test_manual_symlink_file_rejected(self):
+        (self.root / 'alias.md').symlink_to(self.file)
+        self.assertEqual(self.check_file('alias.md').returncode, 2)
+
+    def test_manual_symlink_parent_rejected(self):
+        (self.root / 'docs').mkdir()
+        (self.root / 'docs/f.md').write_text(GOOD)
+        (self.root / 'alias').symlink_to(self.root / 'docs', target_is_directory=True)
+        self.assertEqual(self.check_file('alias/f.md').returncode, 2)
+
+    def test_manual_external_symlink_rejected(self):
+        with tempfile.TemporaryDirectory() as outside:
+            f = Path(outside) / 'f.md'
+            f.write_text(GOOD)
+            (self.root / 'alias.md').symlink_to(f)
+            self.assertEqual(self.check_file('alias.md').returncode, 2)
+
+    def test_symlink_parent_traversal_rejected(self):
+        (self.root / 'docs').mkdir()
+        (self.root / 'f.md').write_text(GOOD)
+        (self.root / 'alias').symlink_to(self.root / 'docs', target_is_directory=True)
+        self.assertEqual(self.check_file('alias/../f.md').returncode, 2)
+        self.assertEqual(self.check_file('docs/../f.md').returncode, 0)
+
     def test_shell_edit_feedback_and_stop_correction(self):
         self.assertEqual(self.event('PreToolUse'), {})
         self.file.write_text(BAD)

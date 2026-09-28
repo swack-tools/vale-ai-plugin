@@ -34,3 +34,11 @@ edit the affected prose, and rerun the checker. Do not turn off rules to obtain 
 clean result. Report remaining findings and unavailable dependencies separately
 from clean checks. A clean result covers the configured rules, not the entire
 Google style guide.
+
+For structured results, add `--format json`. Exit `2` and status `incomplete`
+indicate configuration, parser, or execution errors, which need diagnosis
+rather than prose edits. Use `--doctor` to inspect the selected engine and
+configuration. `submitted_files` does not prove rule coverage; project coverage
+can be unknown even when the result has no findings. If hook feedback omits
+findings, read the full JSON report at its reported path before claiming the
+review is complete.

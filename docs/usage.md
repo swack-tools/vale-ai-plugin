@@ -94,9 +94,41 @@ The script accepts file paths, not directories. For another workspace, run from
 that workspace and use the absolute path to the checker. This preserves project
 configuration discovery. Prefix filenames that start with a hyphen with `./`.
 
-Exit code `0` means no findings, `1` means findings, and `2` means a wrapper or
-dependency error. Vale's own configuration diagnostics can also appear with
-exit code `1`; inspect the message before treating it as a prose finding.
+Exit code `0` means no findings under the selected configuration, `1` means
+findings, and `2` means an incomplete check or invalid input. Configuration,
+parser, and execution failures are incomplete checks, even when other files
+produce findings. A warning from Vale is a finding even if Vale itself exits
+with status `0`.
+
+### Machine-readable results
+
+```sh
+python3 plugins/vale/scripts/prose_lint.py --format json --check ./README.md
+```
+
+Schema version `1` includes `status`, `config_path`, `requested_files`,
+`submitted_files`, `skipped_files`, `findings`, `errors`, and `coverage`.
+Findings retain rule, severity, message, source location, and available
+suggestion metadata. The checker does not apply suggestions.
+
+`submitted_files` records completed engine invocations. It does not prove that
+every file matched a rule. An empty Vale result can mean either no findings or
+no matching configuration. Coverage for a project configuration is therefore
+reported as unknown; the checker does not silently add Google rules.
+
+### Diagnose an installation
+
+```sh
+python3 plugins/vale/scripts/prose_lint.py --doctor
+python3 plugins/vale/scripts/prose_lint.py --doctor --format json
+```
+
+Doctor reports the selected executable and version, configuration, workspace,
+parser requirements, and visible project installation files. It does not
+install dependencies, download rules, or edit settings. Missing optional parsers
+produce format-specific warnings. An unusable engine or configuration returns
+exit code `2`. Configuration files alone cannot prove that a running client
+loaded the hook; inspect the client's hook settings for activation.
 
 ## Project policy
 
