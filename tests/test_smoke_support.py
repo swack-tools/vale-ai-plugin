@@ -108,3 +108,20 @@ class SmokeIsolationTests(unittest.TestCase):
 
         with self.assertRaises(AssertionError):
             helper(trace, [{}, {'text':'Google.Latin'}, {'text':'Google.Latin'}, {}], True, '')
+
+    def test_client_timeout_preserves_output_and_requests(self):
+        import json
+        import os
+        import subprocess
+        helper = getattr(importlib.import_module('smoke_support'), 'run_fixture_client', None)
+        self.assertTrue(callable(helper), 'timeout evidence persistence is missing')
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)
+            requests = [{'synthetic': 'request received'}]
+            code = 'import sys,time; print("ready",flush=True); print("diagnostic",file=sys.stderr,flush=True); time.sleep(5)'
+            with self.assertRaises(subprocess.TimeoutExpired):
+                helper([sys.executable, '-c', code], cwd=output, env=os.environ.copy(), timeout=1,
+                       evidence=output, host='test', requests=requests)
+            self.assertIn('ready', (output / 'test-smoke.jsonl').read_text())
+            self.assertIn('diagnostic', (output / 'test-smoke.stderr').read_text())
+            self.assertEqual(json.loads((output / 'test-smoke-requests.json').read_text()), requests)

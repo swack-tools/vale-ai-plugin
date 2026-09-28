@@ -285,7 +285,8 @@ after correction. Add `--upgrade` for a local plugin update check. Codex require
 The evidence includes client stdout and stderr, model requests, hook envelopes,
 `delivery.json`, and `case.json` with client version and options. Inspect
 requests separately from stdout. A message in one channel isn't evidence that
-it reached another. Evidence contains only disposable synthetic documents.
+it reached another. Client timeouts still retain captured stdout, stderr, and model requests.
+Evidence contains only disposable synthetic documents.
 
 Temporary homes isolate `HOME`, `CODEX_HOME`, `CLAUDE_CONFIG_DIR`, and the `XDG_CONFIG_HOME`
 and `XDG_CACHE_HOME` directories. An environment allowlist retains executable and parser

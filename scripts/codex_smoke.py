@@ -8,7 +8,7 @@ import subprocess
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from smoke_support import temporary_workspace, isolated_environment, evidence_directory, fixture_repository, assert_lifecycle, advance_fixture, UPGRADE_MARKER
+from smoke_support import temporary_workspace, isolated_environment, evidence_directory, fixture_repository, assert_lifecycle, advance_fixture, UPGRADE_MARKER, run_fixture_client
 
 REPO = Path(__file__).resolve().parents[1]
 requests = []
@@ -109,16 +109,13 @@ trust_level = "trusted"
                 refreshed = subprocess.run(command, env=env, cwd=project, capture_output=True, text=True, timeout=60)
                 assert refreshed.returncode == 0, refreshed.stdout + refreshed.stderr
         try:
-            result = subprocess.run(['codex', 'exec', '--ephemeral', '--dangerously-bypass-hook-trust',
+            result = run_fixture_client(['codex', 'exec', '--ephemeral', '--dangerously-bypass-hook-trust',
                                      '-C', str(project), '-s', 'danger-full-access', '--json',
                                      (f'$vale:{args.skill} smoke.md. Run the deterministic hook fixture.' if args.plugin else
                                       'Run the supplied deterministic hook fixture.')],
-                                    env=env, capture_output=True, text=True, timeout=90)
+                                    env=env, cwd=project, timeout=90, evidence=evidence, host='codex', requests=requests)
         finally:
             server.shutdown()
-        (evidence / 'codex-smoke.jsonl').write_text(result.stdout)
-        (evidence / 'codex-smoke.stderr').write_text(result.stderr)
-        (evidence / 'codex-smoke-requests.json').write_text(json.dumps(requests, indent=2))
         print('Evidence: ' + str(evidence))
         print(result.stdout[-5000:])
         print(result.stderr[-1500:])

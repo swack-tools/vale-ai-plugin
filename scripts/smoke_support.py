@@ -133,3 +133,28 @@ def advance_fixture(repository, env):
         skill.write_text(skill.read_text() + '\n' + UPGRADE_MARKER + '\n')
     for command in (['git', 'add', '.'], ['git', '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-qm', 'fixture upgrade']):
         subprocess.run(command, cwd=repository, env=env, check=True, capture_output=True, timeout=30)
+
+
+def run_fixture_client(command, *, cwd, env, timeout, evidence, host, requests):
+    """Retain captured client evidence on success, failure, and timeout."""
+    import json
+    import subprocess
+    stdout, stderr = '', ''
+    try:
+        result = subprocess.run(command, cwd=cwd, env=env, capture_output=True, text=True, timeout=timeout)
+        stdout, stderr = result.stdout, result.stderr
+        return result
+    except subprocess.TimeoutExpired as exc:
+        stdout, stderr = exc.stdout or '', exc.stderr or ''
+        raise
+    except OSError as exc:
+        stderr = str(exc)
+        raise
+    finally:
+        if isinstance(stdout, bytes):
+            stdout = stdout.decode('utf-8', errors='replace')
+        if isinstance(stderr, bytes):
+            stderr = stderr.decode('utf-8', errors='replace')
+        (evidence / f'{host}-smoke.jsonl').write_text(stdout)
+        (evidence / f'{host}-smoke.stderr').write_text(stderr)
+        (evidence / f'{host}-smoke-requests.json').write_text(json.dumps(requests, indent=2))

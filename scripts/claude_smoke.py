@@ -8,7 +8,7 @@ import subprocess
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from smoke_support import temporary_workspace, isolated_environment, evidence_directory, fixture_repository, assert_lifecycle, advance_fixture, UPGRADE_MARKER
+from smoke_support import temporary_workspace, isolated_environment, evidence_directory, fixture_repository, assert_lifecycle, advance_fixture, UPGRADE_MARKER, run_fixture_client
 
 REPO = Path(__file__).resolve().parents[1]
 requests = []
@@ -96,15 +96,12 @@ def main():
         threading.Thread(target=server.serve_forever, daemon=True).start()
         env['ANTHROPIC_BASE_URL'] = f'http://127.0.0.1:{server.server_port}'
         try:
-            result = subprocess.run(['claude', '-p', f'/vale:{args.skill} smoke.md', '--verbose',
+            result = run_fixture_client(['claude', '-p', f'/vale:{args.skill} smoke.md', '--verbose',
                                      '--output-format', 'stream-json', '--dangerously-skip-permissions',
                                      '--max-turns', '8'], cwd=project, env=env,
-                                    capture_output=True, text=True, timeout=90)
+                                    timeout=90, evidence=evidence, host='claude', requests=requests)
         finally:
             server.shutdown()
-        (evidence / 'claude-smoke.jsonl').write_text(result.stdout)
-        (evidence / 'claude-smoke.stderr').write_text(result.stderr)
-        (evidence / 'claude-smoke-requests.json').write_text(json.dumps(requests, indent=2))
         print('Evidence: ' + str(evidence))
         print(result.stdout[-5000:])
         print(result.stderr[-1500:])
