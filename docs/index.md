@@ -16,8 +16,9 @@ on-demand checking command, and shared writing skills.
 | Write or improve technical prose | `google-prose` skill |
 
 Claude Code exposes `/vale:check-prose` and `/vale:google-prose`. Codex provides
-`$vale:check-prose`, `$vale:google-prose`, and the `/skills` picker. An optional Codex
-compatibility command adds `/prompts:vale`.
+`$vale:check-prose`, `$vale:google-prose`, and the `/skills` picker. Older Codex clients
+that support custom prompts can also use the legacy `/prompts:vale` template.
+Codex 0.158.0 uses the skill interfaces.
 
 ## One package for both clients
 

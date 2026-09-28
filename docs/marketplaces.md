@@ -65,7 +65,7 @@ codex plugin remove vale@vale
 ```
 
 Restart the client after an update and review changed hooks when requested.
-The optional Codex prompt has a separate lifecycle: rerun its installer after
+The legacy Codex prompt has a separate lifecycle: rerun its installer after
 pulling updates, or remove it with `--uninstall`.
 
 ## Add Vale to a future organization marketplace
@@ -88,7 +88,9 @@ for `PreToolUse`, `PostToolUse`, and `Stop`.
 Skills resolve the checker relative to their own installed path. They do not
 assume that plugin environment variables are available inside tools run by the
 agent. Claude Code exposes skills as slash commands. Codex uses skill mentions;
-its optional `/prompts:vale` wrapper invokes the same checking skill.
+older clients that still support custom prompts can use the `/prompts:vale`
+wrapper. Codex 0.158.0 rejects that legacy command; use `/skills` or
+`$vale:check-prose` instead.
 
 References include [Codex plugin packaging](https://developers.openai.com/plugins/build/plugins),
 [Claude Code plugin reference](https://code.claude.com/docs/en/plugins-reference),

@@ -65,10 +65,13 @@ Invoke `$vale:check-prose` or `$vale:google-prose`, or select the skill through 
 The plugin installation is managed through your Codex user configuration.
 For a portable project hook installation, use the installer below.
 
-### Compatibility slash command
+### Legacy slash command compatibility
 
-Codex recommends skills; custom prompt commands are deprecated. For clients
-that support them, install this compatibility command:
+Codex 0.158.0 does not recognize `/prompts:vale`. Use the `/skills` slash command
+and select `vale:check-prose`, or mention `$vale:check-prose` directly.
+
+For older clients that still support deprecated custom prompts, this repository
+includes a legacy template and installer:
 
 ```sh
 git clone https://github.com/swack-tools/vale-ai-plugin.git
@@ -76,10 +79,12 @@ cd vale-ai-plugin
 python3 scripts/install_codex_command.py
 ```
 
-Start a new chat and run `/prompts:vale README.md review only`. The command
+On a compatible legacy client, start a new chat and run
+`/prompts:vale README.md review only`. The command
 invokes the installed plugin's checking skill. Install the Codex plugin first.
 The installer writes `$CODEX_HOME/prompts/vale.md`, or
 `~/.codex/prompts/vale.md`, and refuses to replace an unrelated command.
+The template is not a supported command on the tested Codex 0.158.0 runtime.
 Custom prompts are user-scoped; they do not travel with a project checkout.
 
 ## Project or user hooks without a marketplace

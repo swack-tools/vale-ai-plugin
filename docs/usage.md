@@ -7,12 +7,13 @@
 | Automatic hooks | Enabled plugin hooks | Enabled and trusted plugin hooks |
 | On-demand review | `/vale:check-prose` | `$vale:check-prose` or `/skills` |
 | Writing guidance | `/vale:google-prose` | `$vale:google-prose` or `/skills` |
-| Compatibility slash command | Use the checking skill | `/prompts:vale` after optional setup |
+| Legacy prompt command | Use the checking skill | `/prompts:vale` on legacy clients only |
 
 Claude Code exposes plugin skills as namespaced slash commands. Codex supports
 skill mentions and a skill picker. Its optional custom prompt command requires
-the [separate user installation](installation.html#compatibility-slash-command).
-The clients do not use identical command syntax.
+the [separate user installation](installation.html#legacy-slash-command-compatibility).
+Codex 0.158.0 does not recognize custom prompt commands; use `/skills` or a
+skill mention on that version. The clients do not use identical command syntax.
 
 ## Review without editing
 
@@ -44,7 +45,7 @@ In Codex:
 $vale:check-prose Fix the Vale findings in docs/guide.md, then check it again.
 ```
 
-With the optional Codex compatibility command:
+On older Codex clients that support the legacy prompt command:
 
 ```text
 /prompts:vale docs/guide.md fix the findings and check again

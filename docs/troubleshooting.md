@@ -77,9 +77,10 @@ Confirm that the marketplace plugin is installed and enabled, then start a new
 session. The manual hook installer installs hooks only. In Claude Code, use
 `/vale:check-prose`. In Codex, use `$vale:check-prose` or `/skills`.
 
-For `/prompts:vale`, run `scripts/install_codex_command.py` after installing the
-Codex plugin. Custom prompt support is deprecated; use the skill if your client
-does not expose that command. Do not assume a Claude Code command name works in
+Codex 0.158.0 rejects `/prompts:vale`. Use `/skills` and select `vale:check-prose`,
+or mention `$vale:check-prose` directly. The legacy installer
+`scripts/install_codex_command.py` is only for older clients that still support
+deprecated custom prompts. Do not assume a Claude Code command name works in
 Codex.
 
 ## Stop hook feedback
