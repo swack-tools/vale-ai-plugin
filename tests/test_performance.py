@@ -3,6 +3,7 @@ import fcntl
 import hashlib
 import importlib
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -34,6 +35,32 @@ class PerformanceTests(unittest.TestCase):
     def deadline_module(self):
         self.assertTrue((SCRIPTS / 'deadline.py').exists(), 'deadline implementation is missing')
         return importlib.import_module('deadline')
+
+    def test_git_preserves_raw_filename_bytes(self):
+        bindir = self.root / 'bin'
+        bindir.mkdir()
+        executable = bindir / 'git'
+        executable.write_text('#!' + sys.executable + '\nimport sys\nsys.stdout.buffer.write(b"bad\\xff.md\\0")\n')
+        executable.chmod(0o755)
+        with patch.dict(os.environ, {'PATH': str(bindir)}):
+            names = hook.git(self.root, 'ls-files', '-z')
+        self.assertEqual(os.fsencode(names), b'bad\xff.md\0')
+
+    @unittest.skipIf(sys.platform == 'darwin', 'macOS filesystems reject non-UTF-8 filename bytes')
+    def test_non_utf8_edit_is_not_silently_skipped(self):
+        name = os.fsdecode(b'bad\xff.md')
+        path = self.root / name
+        path.write_text('Use this file.\n')
+        self.assertEqual(self.event('PreToolUse'), {})
+        self.assertIn(name, json.loads(self.state.read_text())['files'])
+        path.write_text('We will use this, e.g. for testing.\n')
+        response = self.event('PostToolUse')
+        context = response['hookSpecificOutput']['additionalContext']
+        self.assertTrue('Google.Latin' in context or 'could not complete' in context, context)
+        state = json.loads(self.state.read_text())
+        self.assertIn(name, state['touched'])
+        if 'could not complete' in context:
+            self.assertIn(name, state['pending'])
 
     def test_initialized_pre_does_not_snapshot(self):
         self.event('PreToolUse')

@@ -34,10 +34,11 @@ EVENTS = {'PreToolUse', 'PostToolUse', 'Stop'}
 
 
 def git(cwd, *args, deadline=None):
-    result = run_process(['git', '-C', str(cwd), *args], cwd=cwd, deadline=deadline, timeout=10)
+    result = run_process(['git', '-C', str(cwd), *args], cwd=cwd, deadline=deadline, timeout=10, text=False)
     if result.returncode:
-        raise RuntimeError(result.stderr.strip())
-    return result.stdout
+        raise RuntimeError(os.fsdecode(result.stderr).strip())
+    # Git's NUL-separated filenames are filesystem bytes, not necessarily UTF-8.
+    return os.fsdecode(result.stdout)
 
 
 def workspace(cwd, *, deadline=None):

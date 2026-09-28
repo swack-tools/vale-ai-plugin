@@ -23,7 +23,7 @@ class Deadline:
             raise DeadlineExceeded('Vale work deadline exceeded; unfinished files need another check.')
 
 
-def run_process(args, *, cwd=None, input=None, deadline=None, timeout=20, max_output=8 * 1024 * 1024):
+def run_process(args, *, cwd=None, input=None, deadline=None, timeout=20, max_output=8 * 1024 * 1024, text=True):
     """Drain bounded pipes, and kill the whole parser process group on failure."""
     deadline = deadline or Deadline(timeout)
     deadline.check()
@@ -82,9 +82,10 @@ def run_process(args, *, cwd=None, input=None, deadline=None, timeout=20, max_ou
             proc.wait(timeout=remaining)
         except subprocess.TimeoutExpired as exc:
             raise DeadlineExceeded('Vale subprocess timed out.') from exc
-        return subprocess.CompletedProcess(args, proc.returncode,
-                                           outputs['stdout'].decode('utf-8', errors='replace'),
-                                           outputs['stderr'].decode('utf-8', errors='replace'))
+        stdout, stderr = bytes(outputs['stdout']), bytes(outputs['stderr'])
+        if text:
+            stdout, stderr = (stream.decode('utf-8', errors='replace') for stream in (stdout, stderr))
+        return subprocess.CompletedProcess(args, proc.returncode, stdout, stderr)
     finally:
         # Even an exited parent can leave a parser descendant holding a pipe.
         try:
