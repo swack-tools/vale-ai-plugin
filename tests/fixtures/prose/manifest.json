@@ -1,0 +1,299 @@
+[
+  {
+    "id": "installation-positive",
+    "category": "installation",
+    "kind": "positive",
+    "format": "md",
+    "input": "installation-positive.md",
+    "expected_findings": [
+      {
+        "rule": "Google.We",
+        "line": 1
+      }
+    ],
+    "forbidden_findings": [],
+    "protected_literals": [
+      "tool install --version 2.0"
+    ]
+  },
+  {
+    "id": "installation-negative",
+    "category": "installation",
+    "kind": "negative",
+    "format": "md",
+    "input": "installation-negative.md",
+    "expected_findings": [],
+    "forbidden_findings": [
+      {
+        "rule": "Google.We",
+        "line": 1
+      }
+    ],
+    "protected_literals": [
+      "tool install --version 2.0"
+    ]
+  },
+  {
+    "id": "troubleshooting-positive",
+    "category": "troubleshooting",
+    "kind": "positive",
+    "format": "md",
+    "input": "troubleshooting-positive.md",
+    "expected_findings": [
+      {
+        "rule": "Google.Will",
+        "line": 1
+      }
+    ],
+    "forbidden_findings": [],
+    "protected_literals": [
+      "E_AUTH",
+      "Do not retry"
+    ]
+  },
+  {
+    "id": "troubleshooting-negative",
+    "category": "troubleshooting",
+    "kind": "negative",
+    "format": "md",
+    "input": "troubleshooting-negative.md",
+    "expected_findings": [],
+    "forbidden_findings": [
+      {
+        "rule": "Google.Will",
+        "line": 1
+      }
+    ],
+    "protected_literals": [
+      "E_AUTH",
+      "Do not retry"
+    ]
+  },
+  {
+    "id": "runbooks-positive",
+    "category": "runbooks",
+    "kind": "positive",
+    "format": "md",
+    "input": "runbooks-positive.md",
+    "expected_findings": [
+      {
+        "rule": "Google.We",
+        "line": 1
+      }
+    ],
+    "forbidden_findings": [],
+    "protected_literals": [
+      "must",
+      "/srv/data",
+      "backup --verify",
+      "restart --grace 30"
+    ]
+  },
+  {
+    "id": "runbooks-negative",
+    "category": "runbooks",
+    "kind": "negative",
+    "format": "md",
+    "input": "runbooks-negative.md",
+    "expected_findings": [],
+    "forbidden_findings": [
+      {
+        "rule": "Google.We",
+        "line": 1
+      }
+    ],
+    "protected_literals": [
+      "must",
+      "/srv/data",
+      "backup --verify",
+      "restart --grace 30"
+    ]
+  },
+  {
+    "id": "api-reference-positive",
+    "category": "api-reference",
+    "kind": "positive",
+    "format": "md",
+    "input": "api-reference-positive.md",
+    "expected_findings": [
+      {
+        "rule": "Google.Latin",
+        "line": 1
+      },
+      {
+        "rule": "Google.Latin",
+        "line": 1
+      }
+    ],
+    "forbidden_findings": [
+      {
+        "rule": "Google.Latin",
+        "line": 3
+      },
+      {
+        "rule": "Google.We",
+        "line": 3
+      },
+      {
+        "rule": "Google.Will",
+        "line": 3
+      }
+    ],
+    "protected_literals": [
+      "GET /v1/items?limit=10",
+      "`e.g.`"
+    ]
+  },
+  {
+    "id": "api-reference-negative",
+    "category": "api-reference",
+    "kind": "negative",
+    "format": "md",
+    "input": "api-reference-negative.md",
+    "expected_findings": [],
+    "forbidden_findings": [
+      {
+        "rule": "Google.Latin",
+        "line": 1
+      },
+      {
+        "rule": "Google.Latin",
+        "line": 3
+      },
+      {
+        "rule": "Google.We",
+        "line": 3
+      },
+      {
+        "rule": "Google.Will",
+        "line": 3
+      }
+    ],
+    "protected_literals": [
+      "GET /v1/items?limit=10",
+      "`e.g.`"
+    ]
+  },
+  {
+    "id": "source-comments-positive",
+    "category": "source-comments",
+    "kind": "positive",
+    "format": "py",
+    "input": "source-comments-positive.py",
+    "expected_findings": [
+      {
+        "rule": "Google.We",
+        "line": 1
+      }
+    ],
+    "forbidden_findings": [
+      {
+        "rule": "Google.We",
+        "line": 2
+      },
+      {
+        "rule": "Google.Will",
+        "line": 2
+      },
+      {
+        "rule": "Google.Latin",
+        "line": 2
+      }
+    ],
+    "protected_literals": [
+      "None",
+      "item_id",
+      "ERROR = \"We will retry, e.g. later.\""
+    ]
+  },
+  {
+    "id": "source-comments-negative",
+    "category": "source-comments",
+    "kind": "negative",
+    "format": "py",
+    "input": "source-comments-negative.py",
+    "expected_findings": [],
+    "forbidden_findings": [
+      {
+        "rule": "Google.We",
+        "line": 1
+      },
+      {
+        "rule": "Google.We",
+        "line": 2
+      },
+      {
+        "rule": "Google.Will",
+        "line": 2
+      },
+      {
+        "rule": "Google.Latin",
+        "line": 2
+      }
+    ],
+    "protected_literals": [
+      "None",
+      "item_id",
+      "ERROR = \"We will retry, e.g. later.\""
+    ]
+  },
+  {
+    "id": "correct-prose-positive",
+    "category": "correct-prose",
+    "kind": "positive",
+    "format": "md",
+    "input": "correct-prose-positive.md",
+    "expected_findings": [
+      {
+        "rule": "Google.WordList",
+        "line": 1
+      }
+    ],
+    "forbidden_findings": [
+      {
+        "rule": "Google.Latin",
+        "line": 3
+      },
+      {
+        "rule": "Google.We",
+        "line": 3
+      },
+      {
+        "rule": "Google.Will",
+        "line": 3
+      }
+    ],
+    "protected_literals": [
+      "`We will retry, e.g. later.`"
+    ]
+  },
+  {
+    "id": "correct-prose-negative",
+    "category": "correct-prose",
+    "kind": "negative",
+    "format": "md",
+    "input": "correct-prose-negative.md",
+    "expected_findings": [],
+    "forbidden_findings": [
+      {
+        "rule": "Google.WordList",
+        "line": 1
+      },
+      {
+        "rule": "Google.Latin",
+        "line": 3
+      },
+      {
+        "rule": "Google.We",
+        "line": 3
+      },
+      {
+        "rule": "Google.Will",
+        "line": 3
+      }
+    ],
+    "protected_literals": [
+      "`We will retry, e.g. later.`"
+    ]
+  }
+]
