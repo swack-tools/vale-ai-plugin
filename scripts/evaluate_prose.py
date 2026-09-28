@@ -56,8 +56,11 @@ def unique_object(pairs):
 
 
 def read_json(root, name):
-    return json.loads(read_file(root, name), object_pairs_hook=unique_object,
-                      parse_constant=lambda value: (_ for _ in ()).throw(ValueError('Invalid JSON number: ' + value)))
+    try:
+        return json.loads(read_file(root, name), object_pairs_hook=unique_object,
+                          parse_constant=lambda value: (_ for _ in ()).throw(ValueError('Invalid JSON number: ' + value)))
+    except RecursionError as exc:
+        raise ValueError('JSON nesting exceeds the supported parser limit.') from exc
 
 
 def catalog():
@@ -100,7 +103,7 @@ def literal_count(source, text, literal):
         return text.splitlines().count(literal)
     code = '`' + literal + '`'
     if code in source:
-        return len(re.findall(r'(?<!`)' + re.escape(code) + r'(?!`)', text))
+        return len(re.findall(r'(?<!`)' + re.escape(code) + r'(?!`|[ \t]*`?--?[\w])', text))
     # Remaining labels are words, identifiers, phrases, or already quoted units.
     # Apostrophes belong to a word: "mustn't" does not preserve "must".
     left = r"(?<![\w'’])" if literal[0].isalnum() or literal[0] == '_' else ''
@@ -147,6 +150,11 @@ def inspect_trial(directory, trial, case):
     if trial.get('semantic_verdict') != verdict:
         raise ValueError('semantic_verdict contradicts the review dimensions.')
     reviewer = trial.get('reviewer')
+    if not isinstance(trial.get('notes'), str):
+        raise ValueError('Review notes must be text.')
+    if reviewer is not None and (not isinstance(reviewer, dict) or set(reviewer) != {'kind', 'id'} or
+                                 reviewer['kind'] not in ('human', 'agent') or not nonempty(reviewer['id'])):
+        raise ValueError('Reviewer must contain only a human/agent kind and a nonempty id.')
     if verdict != 'unreviewed':
         if trial.get('reviewed_output_sha256') != digest(output.encode('utf-8')):
             raise ValueError('Output changed or its review hash is missing; review this exact output.')

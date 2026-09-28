@@ -223,3 +223,26 @@ class EvaluationTests(unittest.TestCase):
                 self.assertEqual(self.run_validator()[0], 1)
                 path.write_bytes(original)
                 trial['reviewed_output_sha256'] = hashlib.sha256(original).hexdigest()
+
+    def test_option_outside_code_span_changes_the_command(self):
+        trial = next(t for t in self.trials if t['case_id'] == 'installation' and t['arm'] == 'skill')
+        path = self.root / trial['output_file']
+        original = path.read_bytes()
+        for suffix in (' --force', ' -f', '--force', ' `--force`'):
+            with self.subTest(suffix=suffix):
+                path.write_text(original.decode().replace('`tool install --version 2.0`', '`tool install --version 2.0`' + suffix))
+                trial['reviewed_output_sha256'] = hashlib.sha256(path.read_bytes()).hexdigest()
+                self.assertEqual(self.run_validator()[0], 1)
+        path.write_bytes(original)
+
+    def test_deep_json_returns_incomplete_report(self):
+        (self.root / 'trials.json').write_text('{"x":' * 100000 + '0' + '}' * 100000)
+        run = subprocess.run([sys.executable, str(SCRIPT), '--results', str(self.root), '--format', 'json'],
+                             capture_output=True, text=True, timeout=20)
+        self.assertEqual(run.returncode, 2, run.stderr)
+        self.assertFalse(run.stderr)
+        self.assertEqual(json.loads(run.stdout)['status'], 'incomplete')
+
+    def test_review_metadata_cannot_contain_unvalidated_nested_fields(self):
+        self.trials[0]['reviewer']['extra'] = {'unvalidated': 'data'}
+        self.assertEqual(self.run_validator()[0], 2)

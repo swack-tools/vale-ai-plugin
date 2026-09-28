@@ -107,8 +107,10 @@ In `preflight`, set `fresh_session`, `isolated_home`, and `isolated_workspace` t
 `true` only after checking them. Set `target_skill` to `false` for baseline and
 `true` for the skill arm. Set `automatic_hooks` and `other_prose_tools` to `false`.
 
+The `reviewer` object accepts only `kind` and `id`. Review notes must be text.
 The validator rejects unknown record fields, duplicate JSON keys, reused run
 identifiers, mismatched pair metadata, missing pairs, and unreviewed evidence.
+Malformed JSON and parser nesting failures produce incomplete reports.
 Evidence files must be regular files of at most 1 MiB within the results
 directory. The validator rejects absolute paths, path traversal, and symbolic links.
 
@@ -151,7 +153,9 @@ explanation in the notes. Any unreviewed dimension makes the overall verdict
 Protected-literal checks compare exact occurrence counts against the original
 input and flag missing or added occurrences. Labels inside inline code protect
 the complete code span. Labels that occupy a whole source line protect that
-line. Other word and identifier labels use word boundaries, so an extended
+line. An option immediately after an inline span also changes the protected
+command, including an option outside the closing backtick. Other word and
+identifier labels use word boundaries, so an extended
 identifier or a changed command argument can't pass as an unchanged prefix.
 This conservative check also flags code-format changes that remove the
 original delimiters or line layout. Keep that formatting intact during a trial.
