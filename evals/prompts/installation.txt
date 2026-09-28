@@ -1,0 +1,7 @@
+Revise the following technical text only where needed. Preserve its meaning, commands, paths, identifiers, numbers, quoted errors, negation, requirement strength, prerequisites, and step order. Keep already-correct prose unchanged. Return only the revised document, without commentary or an enclosing code fence.
+
+We install the package with `tool install --version 2.0`.
+
+```sh
+printf 'We will retry, e.g. later.'
+```

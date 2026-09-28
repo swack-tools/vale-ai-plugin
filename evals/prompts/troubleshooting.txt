@@ -1,0 +1,5 @@
+Revise the following technical text only where needed. Preserve its meaning, commands, paths, identifiers, numbers, quoted errors, negation, requirement strength, prerequisites, and step order. Keep already-correct prose unchanged. Return only the revised document, without commentary or an enclosing code fence.
+
+The request will fail if the token is missing.
+
+Do not retry `E_AUTH` before you renew the token.

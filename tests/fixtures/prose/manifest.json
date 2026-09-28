@@ -11,9 +11,23 @@
         "line": 1
       }
     ],
-    "forbidden_findings": [],
+    "forbidden_findings": [
+      {
+        "rule": "Google.We",
+        "line": 4
+      },
+      {
+        "rule": "Google.Will",
+        "line": 4
+      },
+      {
+        "rule": "Google.Latin",
+        "line": 4
+      }
+    ],
     "protected_literals": [
-      "tool install --version 2.0"
+      "tool install --version 2.0",
+      "printf 'We will retry, e.g. later.'"
     ]
   },
   {
@@ -27,10 +41,23 @@
       {
         "rule": "Google.We",
         "line": 1
+      },
+      {
+        "rule": "Google.We",
+        "line": 4
+      },
+      {
+        "rule": "Google.Will",
+        "line": 4
+      },
+      {
+        "rule": "Google.Latin",
+        "line": 4
       }
     ],
     "protected_literals": [
-      "tool install --version 2.0"
+      "tool install --version 2.0",
+      "printf 'We will retry, e.g. later.'"
     ]
   },
   {
