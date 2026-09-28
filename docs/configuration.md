@@ -126,7 +126,9 @@ the separator. Matching is case-sensitive. `*` can cross `/`, so `docs/*.md`
 also matches `docs/api/guide.md`. Patterns don't expand in a shell or use Git's
 ignore syntax. Quote patterns on the command line. Each list accepts up to
 64 patterns of at most 512 characters each. Absolute paths, backslashes, and
-`..` traversal components are invalid.
+`.` or `..` components are invalid. Empty components, such as those in
+`docs//*.md` or `docs/`, are also invalid. Use `docs/*` to match files below a
+directory.
 
 For example, select only documentation and exclude archived guides:
 
@@ -145,7 +147,11 @@ The wrapper reports policy-excluded operands as skipped.
 
 Use `--include`, `--exclude`, `--profile`, or `--scope` for a command-specific
 override. Repeat list options to supply multiple patterns. Each supplied list
-replaces the corresponding project list. It doesn't append to it.
+replaces the corresponding project list. It doesn't append to it. Use
+`--clear-include` to restore default selection or `--clear-exclude` to clear
+project exclusions for one command. A clear option can't combine with its
+corresponding list option. Clearing includes preserves generated-directory
+exclusions, unlike `--include '*'`.
 
 ```sh
 python3 plugins/vale/scripts/prose_lint.py --all \
@@ -235,7 +241,9 @@ skips fenced code. `MD = md` provides the same parser behavior for uppercase
 Markdown names. Add an alias for each additional case spelling you use.
 A filename glob alone doesn't select the correct parser. The wrapper accepts
 aliases only to its supported formats and retains project coverage as unknown.
-It doesn't modify project `.vale.ini` files.
+It doesn't modify project `.vale.ini` files. When includes require format
+discovery, the wrapper accepts project Vale configurations up to 8 MiB. This
+bound is separate from the 64 KiB limit for `.vale-plugin.toml`.
 
 ## Select OpenAPI descriptions
 

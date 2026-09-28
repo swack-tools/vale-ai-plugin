@@ -262,3 +262,33 @@ class PolicyTests(unittest.TestCase):
         self.assertEqual(result['policy']['scope'], 'new-findings')
         self.assertEqual(result['policy']['origins']['scope'], 'cli')
         self.assertFalse((self.root / '.git/vale-state').exists())
+
+    def test_large_vale_config_does_not_use_wrapper_size_limit(self):
+        self.policy('include = ["guide.md"]\n')
+        config = f'StylesPath = {ROOT / "plugins/vale/styles"}\n[*.md]\nBasedOnStyles = Google\n'
+        self.write('.vale.ini', config + '# reviewed comment\n' * 4000)
+        code, result = self.cli('--check', 'guide.md')
+        self.assertEqual(code, 1)
+        self.assertEqual(result['submitted_files'], ['guide.md'])
+        self.assertEqual(result['findings'][0]['rule'], 'Google.Latin')
+
+    def test_cli_can_clear_lists_without_enabling_generated_files(self):
+        self.policy('include = ["build/*"]\nexclude = ["guide.md"]\n')
+        self.write('build/generated.md')
+        code, result = self.cli('--all', '--clear-include', '--clear-exclude')
+        self.assertEqual(code, 1)
+        self.assertEqual(result['submitted_files'], ['guide.md'])
+        _, doctor = self.cli('--doctor', '--clear-include', '--clear-exclude')
+        for key in ('include', 'exclude'):
+            self.assertEqual(doctor['policy'][key], [])
+            self.assertEqual(doctor['policy']['origins'][key], 'cli')
+
+    def test_dot_and_empty_pattern_components_are_rejected(self):
+        for key, pattern in (('include', './docs/*.md'), ('exclude', 'docs/./private/*'),
+                             ('include', 'docs//*.md'), ('exclude', 'docs/'),
+                             ('include', '.')):
+            with self.subTest(key=key, pattern=pattern):
+                self.policy(f'{key} = ["{pattern}"]\n')
+                code, result = self.cli('--check', 'guide.md')
+                self.assertEqual(code, 2)
+                self.assertEqual(result['status'], 'incomplete')

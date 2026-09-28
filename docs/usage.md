@@ -230,4 +230,6 @@ python3 plugins/vale/scripts/prose_lint.py --check docs/guide.md --scope changed
 A policy-excluded file has a `skipped_files` entry with its reason. A request
 containing only skipped files exits `2` with status `skipped`. Report those files
 as unchecked. Don't remove exclusions or accept vocabulary terms merely to
-obtain a clean result. See the [project recipes](configuration.html).
+obtain a clean result. See the [project recipes](configuration.html). For a deliberate one-command
+reset, `--clear-include --clear-exclude` restores default selection without
+enabling generated directories. These options leave the project file unchanged.

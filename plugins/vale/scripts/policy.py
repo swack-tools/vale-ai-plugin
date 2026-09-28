@@ -12,6 +12,7 @@ HARD_EXCLUDED = {'.git', '.codex', '.claude', '.agents'}
 SOFT_EXCLUDED = {'.venv', 'node_modules', 'target', 'dist', 'build', '.vale', 'vendor', '__pycache__'}
 EXCLUDED = HARD_EXCLUDED | SOFT_EXCLUDED
 MAX_POLICY_BYTES = 65536
+MAX_VALE_CONFIG_BYTES = 8 * 1024 * 1024
 
 
 @dataclass(frozen=True)
@@ -50,16 +51,16 @@ def policy_bytes(root):
     return read_config(path)
 
 
-def read_config(path):
+def read_config(path, *, limit=MAX_POLICY_BYTES):
     if path.is_symlink() or any(p.is_symlink() for p in path.parents):
         raise ValueError(f'Refusing a symbolic link for {path.name}.')
     with os.fdopen(os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK), 'rb') as source:
         info = os.fstat(source.fileno())
-        if not stat.S_ISREG(info.st_mode) or info.st_size > MAX_POLICY_BYTES:
-            raise ValueError(f'{path.name} must be a regular file of at most 64 KiB.')
-        content = source.read(MAX_POLICY_BYTES + 1)
-    if len(content) > MAX_POLICY_BYTES:
-        raise ValueError(f'{path.name} exceeds 64 KiB.')
+        if not stat.S_ISREG(info.st_mode) or info.st_size > limit:
+            raise ValueError(f'{path.name} must be a regular file of at most {limit // 1024} KiB.')
+        content = source.read(limit + 1)
+    if len(content) > limit:
+        raise ValueError(f'{path.name} exceeds {limit // 1024} KiB.')
     return content
 
 
@@ -81,8 +82,8 @@ def validate(values):
             for pattern in value:
                 if (not isinstance(pattern, str) or not pattern or len(pattern) > 512 or
                         '\\' in pattern or pattern.startswith('/') or PureWindowsPath(pattern).drive or
-                        '..' in pattern.split('/') or any(ord(c) < 32 for c in pattern)):
-                    raise ValueError(f'{key} requires nonempty root-relative POSIX patterns without traversal (512 characters maximum).')
+                        any(part in ('', '.', '..') for part in pattern.split('/')) or any(ord(c) < 32 for c in pattern)):
+                    raise ValueError(f'{key} requires nonempty root-relative POSIX patterns without empty, dot, or parent components (512 characters maximum).')
 
 
 def load_policy(root, cli_overrides=None):
@@ -103,7 +104,7 @@ def load_policy(root, cli_overrides=None):
         ini = configparser.ConfigParser(interpolation=None, strict=False)
         ini.optionxform = str
         try:
-            ini.read_string('[DEFAULT]\n' + read_config(config).decode('utf-8'))
+            ini.read_string('[DEFAULT]\n' + read_config(config, limit=MAX_VALE_CONFIG_BYTES).decode('utf-8'))
         except configparser.Error as exc:
             raise ValueError('Cannot read project format mappings: ' + str(exc)) from exc
         if ini.has_section('formats'):
