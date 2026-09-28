@@ -9,55 +9,67 @@ import hashlib
 import json
 import os
 from pathlib import Path
-import shutil
 import subprocess
 import sys
 import tempfile
+import time
 
-PACKAGE = Path(__file__).resolve().parents[1]
-EXTENSIONS = set('.md .mdx .txt .rst .adoc .html .rs .py .sh .pl .js .jsx .ts .tsx .go .c .h .cpp .hpp .java .css'.split())
-EXCLUDED = {'.git', '.codex', '.claude', '.agents', '.venv', 'node_modules', 'target', 'dist', 'build', '.vale', 'vendor', '__pycache__'}
-MAX_FILES = 20000
-MAX_BYTES = 1024 * 1024
+from deadline import Deadline, OutputLimitExceeded, run_process
+
+from lint_result import Issue, render_text
+import vale_runner
+
+# Preserve helper names used by existing callers of the original single module.
+PACKAGE = vale_runner.PACKAGE
+EXTENSIONS = vale_runner.EXTENSIONS
+EXCLUDED = vale_runner.EXCLUDED
+MAX_FILES = vale_runner.MAX_FILES
+MAX_BYTES = vale_runner.MAX_BYTES
+eligible = vale_runner.eligible
+configuration = vale_runner.configuration
+empty_result = vale_runner.empty_result
+run_check = vale_runner.run_check
+
 EVENTS = {'PreToolUse', 'PostToolUse', 'Stop'}
 
 
-def git(cwd, *args):
-    result = subprocess.run(['git', '-C', str(cwd), *args], capture_output=True, timeout=10)
+def git(cwd, *args, deadline=None):
+    result = run_process(['git', '-C', str(cwd), *args], cwd=cwd, deadline=deadline, timeout=10, text=False)
     if result.returncode:
-        raise RuntimeError(result.stderr.decode(errors='replace').strip())
-    return result.stdout
+        raise RuntimeError(os.fsdecode(result.stderr).strip())
+    # Git's NUL-separated filenames are filesystem bytes, not necessarily UTF-8.
+    return os.fsdecode(result.stdout)
 
 
-def workspace(cwd):
+def workspace(cwd, *, deadline=None):
     try:
-        return Path(os.fsdecode(git(cwd, 'rev-parse', '--show-toplevel')).strip()).resolve()
+        return Path(git(cwd, 'rev-parse', '--show-toplevel', deadline=deadline).strip()).resolve()
+    except OutputLimitExceeded:
+        # A bounded Git failure is not evidence that this is a non-Git workspace.
+        raise
     except (RuntimeError, FileNotFoundError):
         return cwd
 
 
-def eligible(root, name):
-    path = root / name
-    if path.suffix.lower() not in EXTENSIONS or set(Path(name).parts) & EXCLUDED:
-        return False
-    # Neither file nor directory symlinks can escape the workspace or alias files.
-    if path.is_symlink() or any(p.is_symlink() for p in path.parents):
-        return False
-    return path.is_file() and path.resolve().is_relative_to(root)
-
-
-def snapshot(root):
+def snapshot(root, *, deadline=None):
+    deadline = deadline or Deadline(50)
+    deadline.check()
     try:
-        names = sorted(set(os.fsdecode(git(root, 'ls-files', '-z', '--cached', '--others', '--exclude-standard')).split('\0')) - {''})
+        names = sorted(set(os.fsdecode(git(root, 'ls-files', '-z', '--cached', '--others', '--exclude-standard', deadline=deadline)).split('\0')) - {''})
+    except OutputLimitExceeded:
+        # A bounded Git failure is not evidence that this is a non-Git workspace.
+        raise
     except (RuntimeError, FileNotFoundError):
         names = []
         for directory, dirs, files in os.walk(root, followlinks=False):
+            deadline.check()
             dirs[:] = [d for d in dirs if d not in EXCLUDED and not (Path(directory) / d).is_symlink()]
             names.extend(str((Path(directory) / f).relative_to(root)) for f in files if Path(f).suffix.lower() in EXTENSIONS)
             if len(names) > MAX_FILES:
                 raise RuntimeError('More than 20,000 prose files; narrow the workspace or exclude generated files.')
     result = {}
     for name in names:
+        deadline.check()
         if not eligible(root, name):
             continue
         try:
@@ -92,13 +104,16 @@ def direct_paths(payload, root, cwd):
         except ValueError:
             continue
         if eligible(root, relative):
-            selected.add(relative)
+            selected.add(str(path.resolve().relative_to(root)))
     return selected
 
 
-def state_directory(root):
+def state_directory(root, *, deadline=None):
     try:
-        base = Path(os.fsdecode(git(root, 'rev-parse', '--absolute-git-dir')).strip())
+        base = Path(os.fsdecode(git(root, 'rev-parse', '--absolute-git-dir', deadline=deadline)).strip())
+    except OutputLimitExceeded:
+        # A bounded Git failure is not evidence that this is a non-Git workspace.
+        raise
     except (RuntimeError, FileNotFoundError):
         base = root / '.codex'
     directory = base / 'vale-state'
@@ -108,78 +123,113 @@ def state_directory(root):
     return directory
 
 
+def validate_state(data):
+    if not isinstance(data, dict):
+        raise RuntimeError('Invalid Vale state; stop the session before removing its state file.')
+    version = data.get('schema_version', 0)
+    if type(version) is not int or version not in (0, 1):
+        raise RuntimeError('Unknown Vale state schema; use a compatible plugin or restart with new state.')
+    if 'files' not in data:
+        raise RuntimeError('Invalid Vale state: missing snapshot; stop the session before removing its state file.')
+    files = data['files']
+    if files is not None and not isinstance(files, dict):
+        raise RuntimeError('Invalid Vale snapshot.')
+    for collection in (data.get('touched'), data.get('pending', [])):
+        if not isinstance(collection, list) or any(not isinstance(name, str) for name in collection):
+            raise RuntimeError('Invalid Vale file list in session state.')
+    if files is not None:
+        for name, signature in files.items():
+            if not isinstance(name, str) or not isinstance(signature, list) or len(signature) != 4 or any(type(x) is not int for x in signature):
+                raise RuntimeError('Invalid Vale file signature in session state.')
+    all_names = [*(files or {}), *data['touched'], *data.get('pending', [])]
+    if any(Path(name).is_absolute() or '..' in Path(name).parts for name in all_names):
+        raise RuntimeError('Invalid path in Vale session state.')
+    data['schema_version'] = 1
+    data.setdefault('pending', [])
+    return data
+
+
 @contextmanager
-def locked_state(root, session):
-    directory = state_directory(root)
+def locked_state(root, session, *, deadline=None):
+    deadline = deadline or Deadline(50)
+    directory = state_directory(root, deadline=deadline)
     key = hashlib.sha256(session.encode()).hexdigest()
     state = directory / (key + '.json')
     lock = directory / (key + '.lock')
-    # Refuse symlinks even if changed between the check and open.
     fd = os.open(lock, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
     with os.fdopen(fd, 'w') as handle:
-        fcntl.flock(handle, fcntl.LOCK_EX)
+        while True:
+            deadline.check()
+            try:
+                fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                time.sleep(min(.02, deadline.remaining()))
         if state.is_symlink():
             raise RuntimeError('Refusing a symlink for Vale state.')
         if state.exists():
-            data = json.loads(state.read_text())
-            if not isinstance(data, dict) or not isinstance(data.get('files'), dict):
-                raise RuntimeError('Invalid Vale state; remove the session state file and restart.')
+            with os.fdopen(os.open(state, os.O_RDONLY | os.O_NOFOLLOW)) as saved:
+                if os.fstat(saved.fileno()).st_size > 16 * 1024 * 1024:
+                    raise RuntimeError('Vale session state exceeds the 16 MiB limit.')
+                data = json.load(saved)
+            original = json.dumps(data, sort_keys=True)
+            data = validate_state(data)
         else:
-            data = {'files': None, 'touched': []}
+            original = None
+            data = {'schema_version': 1, 'files': None, 'touched': [], 'pending': []}
         yield data
+        serialized = json.dumps(data, sort_keys=True)
+        if serialized == original:
+            return
         fd, temporary = tempfile.mkstemp(dir=directory, prefix=key, suffix='.tmp')
         try:
             with os.fdopen(fd, 'w') as out:
-                json.dump(data, out)
+                out.write(serialized)
             os.replace(temporary, state)
         finally:
             if os.path.exists(temporary):
                 os.unlink(temporary)
 
 
-def configuration(root):
-    override = root / '.vale.ini'
-    return override if override.is_file() else PACKAGE / '.vale.ini'
+def save_report(root, session, result):
+    directory = state_directory(root, deadline=Deadline(5))
+    key = hashlib.sha256(session.encode()).hexdigest()
+    destination = directory / (key + '.report.json')
+    if destination.is_symlink():
+        raise RuntimeError('Refusing a symlink for the full report.')
+    fd, temporary = tempfile.mkstemp(dir=directory, prefix=key, suffix='.tmp')
+    try:
+        with os.fdopen(fd, 'w') as handle:
+            handle.write(result.to_json())
+        os.replace(temporary, destination)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+    return destination
 
 
-def lint(root, names):
-    if not names:
-        return ''
-    vale = shutil.which('vale')
-    if not vale:
-        raise RuntimeError('Vale is missing from PATH. Install Vale 3.23 or later, then restart your coding agent.')
-    paths = []
-    for name in sorted(names):
-        if not eligible(root, name):
-            continue
-        path = root / name
-        if path.stat().st_size > MAX_BYTES:
-            raise RuntimeError(f'{name} exceeds the 1 MiB file limit; exclude or split it before checking.')
-        paths.append(str(path.resolve()))
-    messages = []
-    # Keep argument sizes bounded. Never pass an untrusted path as a CLI option.
-    for start in range(0, len(paths), 50):
-        result = subprocess.run([vale, '--no-global', '--config', str(configuration(root)),
-                                 '--output=line', '--no-wrap', '--', *paths[start:start + 50]],
-                                cwd=root, capture_output=True, text=True, timeout=20)
-        output = (result.stdout + result.stderr).strip()
-        if result.returncode or output:
-            messages.append(output or f'Vale exited with status {result.returncode}.')
-    return '\n'.join(messages)
-
-
-def feedback(event, message, active=False, error=False):
-    prefix = 'Vale could not complete the check: ' if error else 'Fix the Google documentation style findings in the changed files:\n'
-    text = (prefix + message)[:16000]
+def feedback(event, result, active=False, *, root=None, session=None):
+    suffix = ('Vale already requested a correction pass; report unresolved findings or incomplete checks to the user.'
+              if active else '')
+    report_path = None
+    if len(render_text(result)) + len(suffix) + 256 > 16000 and root is not None:
+        try:
+            report_path = save_report(root, session, result)
+        except (OSError, RuntimeError) as exc:
+            result.errors.append(Issue('report_error', 'Could not save the full report: ' + str(exc)))
+            result.finish()
+    prefix = ('Vale could not complete the check. Resolve the diagnostic before claiming a clean check.'
+              if result.errors else 'Fix the Vale style findings in the changed files:')
+    text = render_text(result, 16000, prefix=prefix, suffix=suffix, report_path=report_path)
     if event == 'PostToolUse':
-        # Context preserves the original tool result, including shell exit status.
         return {'hookSpecificOutput': {'hookEventName': event, 'additionalContext': text}}
     if event == 'Stop' and not active:
         return {'decision': 'block', 'reason': text}
-    return {'systemMessage': text + ('\nVale already requested a correction pass; report unresolved findings to the user.' if active else '')}
+    return {'systemMessage': text}
 
 
-def run_hook(payload):
+def run_hook(payload, *, deadline=None):
+    deadline = deadline or Deadline(50)
     if not isinstance(payload, dict):
         raise ValueError('Hook input must be a JSON object.')
     event = payload.get('hook_event_name')
@@ -189,55 +239,82 @@ def run_hook(payload):
     cwd_value = payload.get('cwd')
     if not isinstance(session, str) or not session or not isinstance(cwd_value, str):
         raise ValueError('Hook input requires session_id and cwd.')
-    cwd = Path(cwd_value).resolve(strict=True)
-    root = workspace(cwd)
     active = payload.get('stop_hook_active') is True
+    root = Path(cwd_value).absolute()
     try:
-        with locked_state(root, session) as data:
-            current = snapshot(root)
-            if data['files'] is None:
-                changed = set()
-            else:
-                changed = {name for name, signature in current.items() if data['files'].get(name) != signature}
+        deadline.check()
+        root = workspace(root.resolve(strict=True), deadline=deadline)
+        with locked_state(root, session, deadline=deadline) as data:
+            if event == 'PreToolUse' and data['files'] is not None:
+                return {}
+            current = snapshot(root, deadline=deadline)
+            changed = ({name for name, signature in current.items() if data['files'].get(name) != signature}
+                       if data['files'] is not None else set())
             if event == 'PreToolUse':
-                # Only initialize: repeated pre-events must not hide concurrent edits.
-                if data['files'] is None:
-                    data['files'] = current
+                data['files'] = current
                 return {}
             if event == 'PostToolUse':
-                changed |= direct_paths(payload, root, cwd) & current.keys()
+                changed |= direct_paths(payload, root, Path(cwd_value).resolve()) & current.keys()
             touched = (set(data['touched']) | changed) & current.keys()
+            pending = (set(data['pending']) | changed) & current.keys()
+            selected = touched if event == 'Stop' else pending
             data['files'] = current
             data['touched'] = sorted(touched)
-            findings = lint(root, touched if event == 'Stop' else changed)
-            if findings:
-                return feedback(event, findings, active)
+            data['pending'] = sorted(pending | selected)
+            result = run_check(root, sorted(selected), deadline=deadline)
+            data['pending'] = sorted((pending | selected) - set(result.submitted_files))
+            if result.status in {'findings', 'incomplete'}:
+                return feedback(event, result, active, root=root, session=session)
             return {}
     except (OSError, ValueError, RuntimeError, subprocess.TimeoutExpired) as error:
-        return feedback(event, str(error), active, error=True)
+        result = empty_result(root)
+        result.errors.append(Issue('hook_error', str(error)))
+        return feedback(event, result.finish(), active, root=root, session=session)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--check', nargs='+', metavar='FILE', help='Check named files without a hook event.')
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument('--check', nargs='+', metavar='FILE', help='Check named files without a hook event.')
+    mode.add_argument('--doctor', action='store_true', help='Inspect the engine, configuration, and parser readiness.')
+    parser.add_argument('--format', choices=('text', 'json'), default='text')
     args = parser.parse_args()
-    if args.check:
-        root = workspace(Path.cwd())
+    if args.check or args.doctor:
+        root = Path.cwd()
         try:
-            names = []
-            for name in args.check:
-                path = Path(name).resolve(strict=True)
-                if not path.is_relative_to(root) or not eligible(root, str(path.relative_to(root))):
-                    raise RuntimeError(f'Unsupported file or path outside the workspace: {name}')
-                names.append(str(path.relative_to(root)))
-            findings = lint(root, names)
-            if findings:
-                print(findings)
-                return 1
-            return 0
-        except (OSError, RuntimeError, subprocess.TimeoutExpired) as error:
-            print(f'Vale: {error}', file=sys.stderr)
+            root = workspace(root.resolve())
+        except (OSError, ValueError, RuntimeError, subprocess.TimeoutExpired) as exc:
+            note = 'Workspace discovery failed: ' + str(exc)
+            if args.doctor:
+                from diagnostics import empty_diagnostics, render_diagnostics
+                report = empty_diagnostics(root)
+                report['overall_status'] = 'incomplete'
+                report['config']['config_path'] = None
+                report['coverage']['verification'] = 'unknown'
+                report['coverage']['note'] = note
+                report['errors'].append(note)
+                print(json.dumps(report) if args.format == 'json' else render_diagnostics(report))
+            else:
+                result = empty_result(root, args.check)
+                result.config_path = ''
+                result.coverage.verification = 'unknown'
+                result.coverage.note = note
+                result.errors.append(Issue('workspace_error', note))
+                result.finish()
+                print(result.to_json() if args.format == 'json' else render_text(result))
             return 2
+        if args.doctor:
+            from diagnostics import inspect_environment, render_diagnostics
+            report = inspect_environment(root)
+            print(json.dumps(report) if args.format == 'json' else render_diagnostics(report))
+            return 2 if report['overall_status'] == 'incomplete' else 0
+        names = []
+        for name in args.check:
+            path = Path(name).absolute()
+            names.append(str(path.relative_to(root)) if path.is_relative_to(root) else str(path))
+        result = run_check(root, names)
+        print(result.to_json() if args.format == 'json' else render_text(result))
+        return result.exit_code
     try:
         result = run_hook(json.load(sys.stdin))
     except (ValueError, OSError) as error:

@@ -93,3 +93,26 @@ The archive SHA-256 is:
 Keep the upstream license with the rules. To update, review the release,
 replace the bundled package, update the recorded version and checksum, and
 run the full test suite and documentation lint before merging.
+
+## Verify parsers and hook performance
+
+Install the [optional parsers](installation.html#optional-markup-parsers), then
+require their integration cases during validation:
+
+```sh
+VALE_REQUIRE_PARSERS=1 python3 -m unittest discover -s tests -v
+python3 scripts/benchmark_hooks.py --files 1000 4000 20000 --samples 5 --output /tmp/vale-benchmark.json
+```
+
+The benchmark uses disposable Git repositories and measures complete hook
+processes after one warm-up per event. It records medians, individual samples,
+and state writes. Compare runs on the same machine; results depend on filesystem
+and system load. Unit tests verify that repeated pre-tool events skip discovery
+and unchanged events preserve state, without machine-specific timing thresholds.
+
+A local macOS comparison with 20,000 small Python files alternated the old and
+new hooks over five samples after a warm-up. Repeated pre-tool events measured
+2.074 seconds before and 0.228 seconds after the fast path. Post-tool events
+measured 1.718 and 1.715 seconds, respectively: broad edit
+detection still requires a scan. These measurements demonstrate the removed
+pre-tool work, not a guarantee for other repositories or machines.

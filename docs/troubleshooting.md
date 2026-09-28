@@ -88,3 +88,22 @@ Codex.
 If the message contains Vale findings and the agent continues with a correction,
 this is the requested Stop block. Claude Code can display that continuation as a
 Stop hook error. A Python traceback or missing executable is a separate failure.
+
+## Missing markup parser
+
+If a check reports `rst2html not found` or `asciidoctor not found`, install the
+[optional parser](installation.html) and make its executable available to the
+agent on `PATH`. Verify the command in the same environment as the agent.
+
+## Incomplete checks and large reports
+
+Run the checker with `--doctor` to inspect its engine, configuration, and parser
+readiness. Use `--format json --check FILE` to distinguish `errors` from prose
+`findings`. Fix configuration or dependency problems before claiming a clean
+check. An empty result with unknown project coverage is not proof that a rule
+matched the file.
+
+If hook feedback omits findings, open the reported JSON file. If saving that
+report fails, the hook reports the failure instead of claiming the report exists.
+After a timeout, reduce the changed batch or resolve the stalled parser; pending
+files are retried on later events. Do not delete active session lock files.

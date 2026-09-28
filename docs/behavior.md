@@ -36,7 +36,8 @@ state updates so overlapping tool calls do not reset the baseline. Findings
 apply to changes observed in the workspace; Vale does not claim which concurrent
 process caused an edit.
 
-A read-only tool does not cause unchanged prose to be checked. Files already
+A read-only tool does not check unchanged prose unless an earlier check failed
+and left files pending. Files already
 changed before the first tool call form part of the baseline. The Stop check
 covers files changed since that baseline, including changes missed by a post-tool
 event. Deletions do not need linting.
@@ -50,6 +51,14 @@ baseline; restart the session after installation.
 Documentation extensions: `.md`, `.mdx`, `.txt`, `.rst`, `.adoc`, and `.html`.
 Source extensions: `.rs`, `.py`, `.sh`, `.pl`, `.js`, `.jsx`, `.ts`, `.tsx`, `.go`,
 `.c`, `.h`, `.cpp`, `.hpp`, `.java`, and `.css`.
+
+The bundled configuration accepts uppercase and mixed-case extensions. The
+checker uses a canonical logical filename for those checks and reports the
+original path. It does not rename files. Project configurations remain
+responsible for their own patterns and format mappings.
+
+AsciiDoc requires `asciidoctor`, and reStructuredText requires `rst2html`.
+Refer to [installation requirements](installation.html) for setup.
 
 Vale controls syntax parsing. Comment and docstring coverage varies by language;
 check a representative file when adding a language to your workflow. Vale does
@@ -93,3 +102,44 @@ that needs editorial judgment, such as audience, structure, and clarity. A clean
 check does not certify full compliance. Read the
 [Google developer documentation style guide](https://developers.google.com/style)
 when reviewing prose beyond the automated rules.
+
+## Reports and incomplete checks
+
+Configuration and parser failures produce an incomplete-check diagnostic.
+They do not ask the agent to rewrite prose. At Stop, a diagnostic can request
+one continuation to resolve or report the problem. The active retry never
+blocks again. The final warning uses `systemMessage`; clients control whether
+that warning is visible to the user, the model, or both.
+
+Hook feedback contains complete findings and a count of shown and omitted
+findings within a 16,000-character budget. When a report is too large, the hook
+saves its complete JSON beside the session state in `<session>.report.json`
+and includes the path. This private file has mode `0600` and replaces the
+previous report for that session. It contains matched snippets, paths, and
+messages, not complete document bodies. Manual JSON checks write to standard
+output and do not create session reports.
+
+## Performance and state lifecycle
+
+The first pre-tool event establishes the baseline. Later pre-tool events skip
+the workspace scan. Unchanged events do not rewrite session state. Post-tool
+and Stop events still scan metadata to detect shell and unknown-tool edits.
+
+Each hook has a 50-second work budget covering discovery, lock waits, and
+checks. Individual engine calls have a maximum of 20 seconds within that
+budget. Subprocess output is limited to 8 MiB. Timeout cleanup terminates the
+process group, including parser children. Report finalization has a separate
+5-second subprocess allowance before the client's 60-second outer timeout.
+Uninterruptible filesystem operations remain subject to operating-system
+behavior; this is not a hard real-time guarantee.
+
+Files whose checks did not complete remain pending. A later post-tool or Stop
+event retries them even if their metadata has not changed. Deleted files leave
+the pending set. Findings from completed batches survive a later batch failure.
+
+State schema `1` preserves the session's touched files and pending checks.
+Existing state migrates on access. An unknown or malformed schema produces an
+incomplete check instead of silently discarding its baseline. No automatic
+age-based cleanup removes another session's files. Stop sessions before
+manually removing their state, lock, and report files from the documented state
+directory; restarting establishes a new baseline.

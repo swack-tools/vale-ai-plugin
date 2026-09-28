@@ -12,7 +12,7 @@ import tempfile
 SOURCE = Path(__file__).resolve().parents[1] / 'plugins/vale'
 MARKER = '# vale-hook'
 OWNERSHIP = '.vale-install.json'
-PROJECT_COMMAND = "python3 -c 'from pathlib import Path; import runpy; p=Path.cwd().resolve(); f=next(r/\".codex/vale/scripts/prose_lint.py\" for r in (p,*p.parents) if (r/\".codex/vale/scripts/prose_lint.py\").is_file()); runpy.run_path(str(f),run_name=\"__main__\")' # vale-hook"
+PROJECT_COMMAND = "python3 -c 'from pathlib import Path; import subprocess, sys; p=Path.cwd().resolve(); f=next(r/\".codex/vale/scripts/prose_lint.py\" for r in (p,*p.parents) if (r/\".codex/vale/scripts/prose_lint.py\").is_file()); sys.exit(subprocess.call([sys.executable,str(f)]))' # vale-hook"
 USER_COMMAND = 'python3 "${CODEX_HOME:-$HOME/.codex}/vale/scripts/prose_lint.py" # vale-hook'
 
 

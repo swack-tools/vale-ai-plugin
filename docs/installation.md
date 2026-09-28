@@ -16,6 +16,36 @@ python3 --version
 vale --version
 ```
 
+### Optional markup parsers
+
+Markdown and source comments use Vale's built-in parsers. Install these tools
+only if your project uses the corresponding markup format:
+
+| Format | Package | Required command |
+| --- | --- | --- |
+| reStructuredText (`.rst`) | Python Docutils | `rst2html` |
+| AsciiDoc (`.adoc`) | Ruby Asciidoctor | `asciidoctor` |
+
+Install Docutils in a Python environment available to the agent:
+
+```sh
+python3 -m venv .venv
+.venv/bin/python -m pip install docutils
+export PATH="$PWD/.venv/bin:$PATH"
+rst2html --version
+```
+
+With Ruby installed, install Asciidoctor:
+
+```sh
+gem install asciidoctor
+asciidoctor --version
+```
+
+Ensure the agent's process inherits the parser commands on `PATH`. Restart the
+agent after changing its environment. A missing parser prevents that format's
+check from completing; it does not mean the document has no findings.
+
 For Linux and WSL, use the [Vale installation guide](https://vale.sh/docs/install).
 Vale needs no account or API key. Review the package scripts before enabling
 hooks. Choose one installation method per workspace to avoid duplicate feedback.
