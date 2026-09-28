@@ -6,6 +6,7 @@
 | --- | --- | --- |
 | Automatic hooks | Enabled plugin hooks | Enabled and trusted plugin hooks |
 | On-demand review | `/vale:check-prose` | `$vale:check-prose` or `/skills` |
+| Procedural guidance | `/vale:procedural-prose` | `$vale:procedural-prose` or `/skills` |
 | Writing guidance | `/vale:google-prose` | `$vale:google-prose` or `/skills` |
 | Legacy prompt command | Use the checking skill | `/prompts:vale` on legacy clients only |
 
@@ -233,3 +234,6 @@ as unchecked. Don't remove exclusions or accept vocabulary terms merely to
 obtain a clean result. See the [project recipes](configuration.html). For a deliberate one-command
 reset, `--clear-include --clear-exclude` restores default selection without
 enabling generated directories. These options leave the project file unchanged.
+
+For procedural examples, profile selection, and project-policy compatibility,
+see the [writing profile guide](profiles.html).

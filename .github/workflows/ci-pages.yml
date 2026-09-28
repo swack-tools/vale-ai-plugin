@@ -58,6 +58,11 @@ jobs:
       matrix:
         host: [codex, claude]
         scope: [changed-files, new-findings]
+        include:
+          - scope: changed-files
+            skill: check-prose
+          - scope: new-findings
+            skill: procedural-prose
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -80,10 +85,10 @@ jobs:
         run: npm install --global @anthropic-ai/claude-code@2.1.277
       - name: Exercise Codex marketplace and hooks
         if: matrix.host == 'codex'
-        run: python scripts/codex_smoke.py --plugin --feedback-scope "${{ matrix.scope }}"
+        run: python scripts/codex_smoke.py --plugin --feedback-scope "${{ matrix.scope }}" --skill "${{ matrix.skill }}"
       - name: Exercise Claude marketplace and hooks
         if: matrix.host == 'claude'
-        run: python scripts/claude_smoke.py --scope project --feedback-scope "${{ matrix.scope }}"
+        run: python scripts/claude_smoke.py --scope project --feedback-scope "${{ matrix.scope }}" --skill "${{ matrix.skill }}"
       - name: Retain native fixture evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

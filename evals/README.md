@@ -18,3 +18,9 @@ record schema, isolated trial procedure, review rubric, exit codes, and limits.
 The default test suite runs without model credentials. Synthetic validator tests
 aren't observations of model writing quality. A real-model pilot remains unrun.
 These checks don't verify editorial effectiveness.
+
+For procedural writing, pass `--suite procedural-prose` to both preparation and
+validation. This suite needs fourteen records for seven pairs and snapshots
+`procedural-prose`. The default remains six Google pairs. See the
+[profile guide](https://vale.swacktech.com/profiles.html) for cases and limits.
+Both real-model pilots remain unrun.
