@@ -92,7 +92,7 @@ Edit the generated records after the runs. Each record has these fields:
 | `host`, `client_version`, `model` | A host name of `codex` or `claude`, an actual client version, and a model identifier |
 | `timestamp` | A timestamp with a timezone, such as `2026-09-28T12:00:00Z` |
 | `session_id`, `home`, `workspace` | Distinct identifiers for each isolated run |
-| `settings` | A nonempty object of model settings with string, number, or boolean values |
+| `settings` | A nonempty object of model settings with string, finite number, or boolean values |
 | `prompt_file`, `prompt_sha256` | A relative prompt path and its `SHA-256` digest |
 | `skill_file`, `skill_sha256` | The target skill snapshot and digest for the skill arm. Both `null` for baseline |
 | `output_file` | The relative path to the raw returned document |
@@ -153,12 +153,12 @@ explanation in the notes. Any unreviewed dimension makes the overall verdict
 Protected-literal checks compare exact occurrence counts against the original
 input and flag missing or added occurrences. Labels inside inline code protect
 the complete code span. Labels that occupy a whole source line protect that
-line. An option later on the same line also changes the protected command,
-including options outside the closing backtick. This check recognizes common
-emphasis, link, HTML, and escaped-dash forms. It can conservatively flag an
-unrelated option mention on that line too. Other word and
-identifier labels use word boundaries, so an extended
-identifier or a changed command argument can't pass as an unchanged prefix.
+line. Text after a protected inline code span must match the rest of its original
+source line exactly. This rule catches added options, positional arguments,
+pipes, and redirections, including additions that use markup. It also flags
+harmless edits to that trailing prose. You can edit prose before the span.
+Keep its trailing text intact. Other word and identifier labels use word
+boundaries, so an extended identifier can't pass as an unchanged prefix.
 This conservative check also flags code-format changes that remove the
 original delimiters or line layout. Keep that formatting intact during a trial.
 

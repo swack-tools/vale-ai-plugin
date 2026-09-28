@@ -273,3 +273,32 @@ class EvaluationTests(unittest.TestCase):
         self.assertEqual(run.returncode, 2, run.stderr)
         self.assertFalse(run.stderr)
         self.assertEqual(json.loads(run.stdout)['status'], 'incomplete')
+
+    def test_shell_and_positional_continuations_change_the_command(self):
+        trial = self.trials[0]
+        path = self.root / trial['output_file']
+        original = path.read_bytes()
+        for suffix in (' | tee /tmp/install.log', ' > /tmp/log', ' && reboot',
+                       ' package-name', ' /tmp/package', ' ; reboot', ' $(reboot)',
+                       ' **package-name**', ' &amp;&amp; reboot'):
+            with self.subTest(suffix=suffix):
+                path.write_text(original.decode().replace('`tool install --version 2.0`', '`tool install --version 2.0`' + suffix))
+                trial['reviewed_output_sha256'] = hashlib.sha256(path.read_bytes()).hexdigest()
+                self.assertEqual(self.run_validator()[0], 1)
+
+    def test_protected_code_allows_prose_edits_before_it(self):
+        trial = self.trials[0]
+        path = self.root / trial['output_file']
+        path.write_text(path.read_text().replace('We install the package with', 'Install the package with'))
+        trial['reviewed_output_sha256'] = hashlib.sha256(path.read_bytes()).hexdigest()
+        self.assertEqual(self.run_validator()[0], 0)
+
+    def test_overflowed_json_numbers_are_incomplete(self):
+        original = (self.root / 'trials.json').read_text()
+        for number in ('1e400', '-1e400', '1e500'):
+            with self.subTest(number=number):
+                (self.root / 'trials.json').write_text(original.replace('"reasoning_effort": "medium"', '"temperature": ' + number))
+                run = subprocess.run([sys.executable, str(SCRIPT), '--results', str(self.root), '--format', 'json'], capture_output=True, text=True)
+                self.assertEqual(run.returncode, 2, run.stderr)
+                self.assertFalse(run.stderr)
+                self.assertEqual(json.loads(run.stdout)['status'], 'incomplete')

@@ -3,8 +3,8 @@
 import argparse
 from datetime import datetime
 import hashlib
-from html import unescape
 import json
+import math
 import os
 import re
 from pathlib import Path, PurePosixPath
@@ -56,9 +56,16 @@ def unique_object(pairs):
     return result
 
 
+def finite_float(value):
+    number = float(value)
+    if not math.isfinite(number):
+        raise ValueError('Invalid JSON number: ' + value)
+    return number
+
+
 def read_json(root, name):
     try:
-        return json.loads(read_file(root, name), object_pairs_hook=unique_object,
+        return json.loads(read_file(root, name), object_pairs_hook=unique_object, parse_float=finite_float,
                           parse_constant=lambda value: (_ for _ in ()).throw(ValueError('Invalid JSON number: ' + value)))
     except RecursionError as exc:
         raise ValueError('JSON nesting exceeds the supported parser limit.') from exc
@@ -98,22 +105,20 @@ def nonempty(value):
     return isinstance(value, str) and bool(value.strip())
 
 
-def has_option_continuation(tail):
-    """Conservatively detect same-line options through common markup wrappers."""
-    raw = unescape(tail).replace('\\-', '-')
-    visible = re.sub(r'<[^<>]*>', '', raw).translate(str.maketrans('', '', '*_~`[]'))
-    option = r'(?<![A-Za-z0-9])--?[A-Za-z0-9_]'
-    return bool(re.search(option, raw) or re.search(option, visible))
-
-
 def literal_count(source, text, literal):
     """Preserve complete code units; do not count changed prefixes as literals."""
     if literal in source.splitlines():
         return text.splitlines().count(literal)
     code = '`' + literal + '`'
     if code in source:
-        spans = re.finditer(r'(?<!`)' + re.escape(code) + r'(?!`)', text)
-        return sum(not has_option_continuation(text[match.end():].split('\n', 1)[0]) for match in spans)
+        pattern = r'(?<!`)' + re.escape(code) + r'(?!`)'
+        # Freeze the source tail rather than guessing which shell or markup
+        # forms can extend a command. Semantic review still checks context.
+        tails = {source[match.end():].split('\n', 1)[0] for match in re.finditer(pattern, source)}
+        spans = list(re.finditer(pattern, text))
+        if any(text[match.end():].split('\n', 1)[0] not in tails for match in spans):
+            return 0
+        return len(spans)
     # Remaining labels are words, identifiers, phrases, or already quoted units.
     # Apostrophes belong to a word: "mustn't" does not preserve "must".
     left = r"(?<![\w'’])" if literal[0].isalnum() or literal[0] == '_' else ''
