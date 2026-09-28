@@ -43,7 +43,7 @@ def safe_bytes(path, limit=vale_runner.MAX_BYTES):
     return content
 
 
-def policy_identity(root, deadline):
+def policy_identity(root, deadline, wrapper_policy=None):
     """Fingerprint only a sealed local configuration and bounded style tree."""
     if vale_runner.configuration(root) != vale_runner.PACKAGE / '.vale.ini':
         raise ValueError('Project policy dependencies are unverified; use a full-file check.')
@@ -90,6 +90,11 @@ def policy_identity(root, deadline):
     if version.returncode or version.stderr.strip():
         raise ValueError('Vale version could not be verified.')
     fingerprint.update(os.fsencode(str(Path(vale).resolve())) + b'\0' + version.stdout.encode())
+    from dataclasses import asdict
+    from policy import load_policy, policy_bytes
+    effective = wrapper_policy or load_policy(root)
+    fingerprint.update(json.dumps(asdict(effective), sort_keys=True).encode())
+    fingerprint.update(policy_bytes(root) or b'')
     return fingerprint.hexdigest()
 
 
@@ -108,7 +113,7 @@ def session_directory(directory, session):
     return directory / (digest(session.encode()) + '.baseline')
 
 
-def capture(directory, root, names, deadline):
+def capture(directory, root, names, deadline, wrapper_policy=None):
     """Call once under the session lock, before the first editing tool runs."""
     if directory.exists() or directory.is_symlink():
         # Never replace a partial capture with bytes from a later editing step.
@@ -119,7 +124,7 @@ def capture(directory, root, names, deadline):
     manifest = {'schema_version': 1, 'complete': False, 'policy': None, 'files': {}}
     atomic_json(directory / 'manifest.json', manifest)
     try:
-        manifest['policy'] = policy_identity(root, deadline)
+        manifest['policy'] = policy_identity(root, deadline, wrapper_policy)
     except (OSError, ValueError, RuntimeError) as exc:
         manifest['reason'] = str(exc)
         atomic_json(directory / 'manifest.json', manifest)
@@ -196,6 +201,9 @@ def git_reader(root, revision, deadline):
     # An earlier project policy cannot be reconstructed through the bundled adapter.
     old_config = git_output(root, ['ls-tree', '-z', oid, '--', '.vale.ini'], deadline)
     reason = 'The base commit has a project policy with unverified dependencies.' if old_config else None
+    from policy import policy_bytes
+    if read('.vale-plugin.toml').encode('utf-8') != (policy_bytes(root) or b''):
+        reason = 'Wrapper policy differs from the base commit.'
     package = vale_runner.PACKAGE
     if package.is_relative_to(root):
         tracked_policy = [str((package / item).relative_to(root)) for item in ('.vale.ini', 'styles')]
@@ -207,7 +215,7 @@ def git_reader(root, revision, deadline):
     return oid, read, reason
 
 
-def compare(root, result, documents, initial_policy, *, directory=None, revision=None, deadline):
+def compare(root, result, documents, initial_policy, *, directory=None, revision=None, deadline, wrapper_policy=None):
     """Keep raw findings and select only conservatively actionable indexes."""
     comparison = dict(mode='new-findings', baseline_source='git' if revision is not None else 'session',
                       new=0, existing=0, resolved=0, fallback_reason=None, actionable_indexes=[])
@@ -223,7 +231,7 @@ def compare(root, result, documents, initial_policy, *, directory=None, revision
                 raise ValueError('Git baseline is unavailable.') from exc
             if reason:
                 raise ValueError(reason)
-        policy = policy_identity(root, deadline)
+        policy = policy_identity(root, deadline, wrapper_policy)
         if initial_policy != policy:
             raise ValueError('Policy was unverified or changed during the current check.')
         if revision is None:
@@ -238,7 +246,7 @@ def compare(root, result, documents, initial_policy, *, directory=None, revision
                 after = documents[name]
                 if after is None:
                     raise ValueError('Current comparison text exceeds the 16 MiB memory limit.')
-                previous = vale_runner.check_document(root, before, name, deadline=deadline) if before else None
+                previous = vale_runner.check_document(root, before, name, deadline=deadline, policy=wrapper_policy) if before else None
                 if previous is not None and previous.errors:
                     raise ValueError('Baseline lint did not complete: ' + previous.errors[0].message)
                 diff = classify_findings(before, after, previous.findings if previous else [], [result.findings[i] for i in indexes])
@@ -253,7 +261,7 @@ def compare(root, result, documents, initial_policy, *, directory=None, revision
             except (OSError, ValueError, RuntimeError) as exc:
                 reasons.append(name + ': ' + str(exc))
                 comparison['actionable_indexes'].extend(indexes)
-        if policy_identity(root, deadline) != policy:
+        if policy_identity(root, deadline, wrapper_policy) != policy:
             raise ValueError('Policy changed while comparison was running.')
         # Findings from partially failed batches are still actionable.
         submitted = {str(root / name) for name in result.submitted_files}
