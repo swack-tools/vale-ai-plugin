@@ -42,7 +42,13 @@ jobs:
         with:
           python-version: '3.11'
       - run: pip install -r requirements-docs.txt
+      - name: Install verified Vale for generated pages
+        run: |
+          python scripts/install_vale_ci.py "$RUNNER_TEMP/vale-bin"
+          echo "$RUNNER_TEMP/vale-bin" >> "$GITHUB_PATH"
       - run: python scripts/build_docs.py
+      - name: Check generated page style
+        run: python scripts/check_docs.py site/*.html
       - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         with:

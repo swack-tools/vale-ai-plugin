@@ -15,6 +15,7 @@ MAX_TOTAL_BYTES = 16 * 1024 * 1024
 MAX_POLICY_FILES = 256
 # Changing the bundled configuration or these rules requires reviewing locality.
 TRUSTED_CONFIG = '16d6a15f80c63165715d3c5fa669ce9582a8ca611cf201d213880c900614d245'
+TRUSTED_POLICY = 'dd65d5c0353e15692cea9bcd16171e46a46cb8f88bfb633ab47fdad5bc2897b7'
 TRUSTED_RULES = {
     'Latin': 'fb453cb47632e8ab3687f4c6f1918b29f85ed653ed00c26d0497ad0c7c22b559',
     'We': '40887903a1ec910f1760dcfcca775d6731a07e157ab79d76db7ca8c0e9de69e4',
@@ -52,7 +53,12 @@ def policy_identity(root, deadline):
         raise ValueError('Bundled configuration changed; comparison locality needs review.')
     fingerprint = hashlib.sha256(config)
     count = total = 0
-    for directory, dirs, files in os.walk(package / 'styles', followlinks=False):
+    verified_rules = set()
+
+    def reject_walk_error(error):
+        raise error
+
+    for directory, dirs, files in os.walk(package / 'styles', followlinks=False, onerror=reject_walk_error):
         deadline.check()
         dirs.sort()
         if any((Path(directory) / d).is_symlink() for d in dirs):
@@ -69,12 +75,14 @@ def policy_identity(root, deadline):
                 raise ValueError('Style fingerprint exceeds its byte limit.')
             relative = str(path.relative_to(package))
             if relative.startswith('styles/Google/') and path.stem in TRUSTED_RULES:
+                verified_rules.add(path.stem)
                 if digest(content) != TRUSTED_RULES[path.stem]:
                     raise ValueError('A local rule changed; comparison locality needs review.')
             fingerprint.update(relative.encode() + b'\0' + content + b'\0')
-    for name in TRUSTED_RULES:
-        if not (package / 'styles/Google' / (name + '.yml')).is_file():
-            raise ValueError('A required local rule is missing.')
+    if verified_rules != TRUSTED_RULES.keys():
+        raise ValueError('A required local rule was not read and verified.')
+    if fingerprint.hexdigest() != TRUSTED_POLICY:
+        raise ValueError('Bundled styles or vocabulary changed; comparison dependencies need review.')
     vale = shutil.which('vale')
     if not vale:
         raise ValueError('Vale is missing from PATH.')
@@ -191,7 +199,10 @@ def git_reader(root, revision, deadline):
     package = vale_runner.PACKAGE
     if package.is_relative_to(root):
         tracked_policy = [str((package / item).relative_to(root)) for item in ('.vale.ini', 'styles')]
-        if git_output(root, ['diff', '--name-only', oid, '--', *tracked_policy], deadline):
+        # Omit --exclude-standard: ignored installed policies also lack Git history.
+        if git_output(root, ['ls-files', '--others', '-z', '--', *tracked_policy], deadline):
+            reason = 'Bundled policy has untracked or ignored inputs; historical equality is unverified.'
+        elif git_output(root, ['diff', '--name-only', oid, '--', *tracked_policy], deadline):
             reason = 'Bundled policy differs from the base commit.'
     return oid, read, reason
 

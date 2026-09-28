@@ -219,7 +219,8 @@ class ScopeTests(unittest.TestCase):
             self.file.write_text(NEW)
             payload['hook_event_name'] = 'Stop'
             output = str(hook.run_hook(payload, scope='new-findings'))
-            self.assertIn('Policy or Vale version changed', output)
+            self.assertIn('Bundled styles or vocabulary changed', output)
+            self.assertIn('2 new', output)
             rule = package / 'styles/Google/Latin.yml'
             rule.write_text(rule.read_text() + '\n# changed\n')
             self.assertIn('local rule changed', str(hook.run_hook(payload, scope='new-findings')))
@@ -292,3 +293,74 @@ class ScopeTests(unittest.TestCase):
             result = hook.scoped_check(self.root, ['guide.md'], deadline=Deadline(50), scope='new-findings', revision='HEAD')
         self.assertEqual(len(result.actionable_findings), 2)
         self.assertIn('Current comparison text', result.comparison['fallback_reason'])
+
+    def test_untracked_rule_cannot_hide_a_new_policy_finding(self):
+        hook = importlib.import_module('prose_lint')
+        runner = importlib.import_module('vale_runner')
+        from deadline import Deadline
+        package = self.root / 'package'
+        shutil.copytree(ROOT / 'plugins/vale', package)
+        self.file.write_text('Use a test file.\n')
+        self.git('add', '.')
+        self.git('-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '-qm', 'package')
+        (package / 'styles/Google/NewRule.yml').write_text("extends: existence\nmessage: 'New policy finding.'\nlevel: warning\ntokens: ['Use']\n")
+        with patch.object(runner, 'PACKAGE', package):
+            result = hook.scoped_check(self.root, ['guide.md'], deadline=Deadline(50), scope='new-findings', revision='HEAD')
+        self.assertEqual(result.status, 'findings')
+        self.assertEqual(result.findings[0].rule, 'Google.NewRule')
+        self.assertEqual(result.comparison['new'], 1)
+        self.assertTrue(result.comparison['fallback_reason'])
+
+    def test_ignored_installed_policy_has_no_historical_identity(self):
+        hook = importlib.import_module('prose_lint')
+        runner = importlib.import_module('vale_runner')
+        from deadline import Deadline
+        package = self.root / '.codex/vale'
+        shutil.copytree(ROOT / 'plugins/vale', package)
+        (self.root / '.gitignore').write_text('.codex/\n')
+        with patch.object(runner, 'PACKAGE', package):
+            result = hook.scoped_check(self.root, ['guide.md'], deadline=Deadline(50), scope='new-findings', revision='HEAD')
+        self.assertEqual(result.status, 'findings')
+        self.assertTrue(result.comparison['fallback_reason'])
+
+    @unittest.skipIf(os.geteuid() == 0, 'Root bypasses directory permission checks')
+    def test_unreadable_style_directory_rejects_policy_identity(self):
+        baseline = importlib.import_module('baseline')
+        runner = importlib.import_module('vale_runner')
+        from deadline import Deadline
+        package = self.root / 'package'
+        shutil.copytree(ROOT / 'plugins/vale', package)
+        styles = package / 'styles'
+        styles.chmod(0o111)
+        try:
+            with patch.object(runner, 'PACKAGE', package), self.assertRaises((OSError, ValueError)):
+                baseline.policy_identity(self.root, Deadline(50))
+        finally:
+            styles.chmod(0o755)
+
+    def test_unverified_added_style_cannot_become_a_session_policy(self):
+        baseline = importlib.import_module('baseline')
+        runner = importlib.import_module('vale_runner')
+        from deadline import Deadline
+        package = self.root / 'package'
+        shutil.copytree(ROOT / 'plugins/vale', package)
+        (package / 'styles/Google/Extra.yml').write_text("extends: script\nmessage: 'External dependency.'\nscript: file.txt\n")
+        with patch.object(runner, 'PACKAGE', package), self.assertRaises(ValueError):
+            baseline.policy_identity(self.root, Deadline(50))
+
+    def test_custom_format_fallback_preserves_full_file_behavior(self):
+        self.file = self.root / 'guide.MD'
+        self.file.write_text(OLD + '\n```text\n' + OLD + '```\n')
+        (self.root / '.vale.ini').write_text('StylesPath = ' + str(ROOT / 'plugins/vale/styles') +
+                                            '\nMinAlertLevel = warning\n[formats]\nMD = txt\n[*.MD]\nBasedOnStyles = Google\n')
+        full = json.loads(self.cli('--check', self.file.name, '--format', 'json').stdout)
+        compared = self.compare()
+        self.assertEqual(compared['findings'], full['findings'])
+        self.assertTrue(compared['comparison']['fallback_reason'])
+
+    def test_custom_document_adapter_uses_project_format_mapping(self):
+        runner = importlib.import_module('vale_runner')
+        (self.root / '.vale.ini').write_text('StylesPath = ' + str(ROOT / 'plugins/vale/styles') +
+                                            '\nMinAlertLevel = warning\n[formats]\nMD = txt\n[*.MD]\nBasedOnStyles = Google\n')
+        result = runner.check_document(self.root, OLD + '\n```text\n' + OLD + '```\n', 'guide.MD')
+        self.assertEqual(len(result.findings), 2)

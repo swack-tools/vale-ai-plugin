@@ -292,7 +292,7 @@ def scoped_check(root, names, *, deadline, scope='changed-files', directory=None
     except (OSError, ValueError, RuntimeError):
         policy = None
     documents = {}
-    result = run_check(root, names, deadline=deadline, documents=documents)
+    result = run_check(root, names, deadline=deadline, documents=documents if policy is not None else None)
     return baseline.compare(root, result, documents, policy, directory=directory, revision=revision, deadline=deadline)
 
 def main():

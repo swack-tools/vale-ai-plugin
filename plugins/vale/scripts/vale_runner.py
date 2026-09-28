@@ -157,7 +157,7 @@ def _execute(root, result, jobs, deadline, vale, *, document=None, captured=None
             content = None
             if logical:
                 path = batch[0][1]
-                command += ['--ext=' + path.suffix.lower(), '--path=' + logical]
+                command += ['--ext=' + Path(logical).suffix, '--path=' + logical]
                 if document is None:
                     with path.open('rb') as source:
                         raw = source.read(MAX_BYTES + 1)

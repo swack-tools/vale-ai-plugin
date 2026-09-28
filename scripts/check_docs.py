@@ -13,7 +13,7 @@ from vale_runner import PACKAGE, decode_findings, empty_result
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('files', nargs='*', type=Path, help='Optional specific Markdown files to check.')
+    parser.add_argument('files', nargs='*', type=Path, help='Optional specific documentation files to check.')
     args = parser.parse_args()
     paths = [p.resolve() for p in args.files] if args.files else [
         ROOT / 'README.md', *sorted((ROOT / 'docs').rglob('*.md')),

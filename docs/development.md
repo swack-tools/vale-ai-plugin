@@ -126,7 +126,8 @@ findings and selects actionable indexes for feedback. `prose_lint.py` coordinate
 command-line scopes and lifecycle state. These modules share one monotonic deadline.
 
 When updating bundled rules or configuration, review the locality assumptions
-before updating trusted hashes in `baseline.py`. Leaving an old hash produces
+before updating the trusted rule hashes and complete policy digest in
+`baseline.py`. Leaving an old hash produces
 full-file feedback. Don't update hashes merely to silence the fallback.
 Test inserted lines, duplicates, moved paragraphs, changed context, policy
 changes, corrupt baselines, byte caps, and both installation scopes.
@@ -151,3 +152,7 @@ structured findings and fails on any alert, even when Vale itself returns zero.
 The workflow uses this stricter gate for every authored guide, skill, and prompt. Third-party rules and license
 text retain their upstream wording. Zero automated findings doesn't replace
 editorial review of accuracy, accessibility, or complete Google style guidance.
+
+The build job also runs `python3 scripts/check_docs.py site/*.html` after
+rendering. This checks generated navigation, labels, and footer text alongside
+the guide content. Source and rendered checks both require zero findings.

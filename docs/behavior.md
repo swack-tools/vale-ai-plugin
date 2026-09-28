@@ -194,8 +194,8 @@ documents under the same verified policy, matching can include other rules.
 This is conservative occurrence matching, not a semantic equivalence test.
 
 Comparison fingerprints the sealed bundled configuration, local style and
-vocabulary bytes, and Vale's executable path and version. A rule locality
-allowlist also verifies the six rule files. Changed inputs invalidate
+vocabulary bytes, and Vale's executable path and version. A reviewed policy digest verifies the complete bundled style tree. A rule
+locality allowlist also verifies the six rule files. Changed inputs invalidate
 suppression. Project configurations always produce full-file feedback because
 the checker can't prove their include and parser dependencies. AsciiDoc and
 reStructuredText also fall back because they use external parsers. This
@@ -203,9 +203,12 @@ restriction affects comparison only: full-file checks still use your policy
 and installed parsers.
 
 Manual comparisons reject an earlier project policy or a changed tracked
-bundled policy. For an installed package outside the checked repository, the
+bundled policy. Untracked and ignored policy inputs inside the checked Git
+workspace also cause fallback because they have no verified historical identity. For an installed package outside the checked repository, the
 current verified package checks both Git text and current text. It doesn't
-reconstruct historical plugin installations.
+reconstruct historical plugin installations. Changes to the reviewed bundled
+style tree require a locality review and updated trusted digest before comparison
+can resume. This includes added rules and vocabulary files.
 
 A missing or corrupt baseline, uncertain alignment, or failed baseline lint
 keeps current findings actionable and reports the reason. Current lint errors
