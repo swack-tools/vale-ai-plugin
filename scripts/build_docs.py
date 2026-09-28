@@ -7,7 +7,7 @@ import markdown
 
 ROOT = Path(__file__).resolve().parents[1]
 PAGES = [('index', 'Overview'), ('features', 'Feature guide'), ('installation', 'Installation'), ('usage', 'Commands and skills'), ('marketplaces', 'Marketplaces'), ('behavior', 'How it works'),
-         ('configuration', 'Configuration'), ('troubleshooting', 'Troubleshooting'), ('development', 'Development'), ('evaluation', 'Writing evaluation')]
+         ('configuration', 'Configuration'), ('profiles', 'Writing profiles'), ('troubleshooting', 'Troubleshooting'), ('development', 'Development'), ('evaluation', 'Writing evaluation')]
 
 
 def main():
@@ -27,7 +27,7 @@ def main():
 <link rel="canonical" href="https://vale.swacktech.com/{'' if slug == 'index' else slug + '.html'}"></head>
 <body><a class="skip" href="#content">Skip to content</a>
 <header><a class="brand" href="index.html"><span class="mark" aria-hidden="true">V.</span>Vale <span class="subtitle">for Claude Code and Codex</span></a><a class="source" href="https://github.com/swack-tools/vale-ai-plugin">Source on GitHub <span aria-hidden="true">↗</span></a></header>
-<div class="layout"><aside><p class="eyebrow">Documentation</p><nav aria-label="Documentation">{nav}</nav><div class="version">v0.4.0<br>Powered by Vale + Google rules</div></aside>
+<div class="layout"><aside><p class="eyebrow">Documentation</p><nav aria-label="Documentation">{nav}</nav><div class="version">v0.5.0<br>Powered by Vale + Google rules</div></aside>
 <main id="content"><p class="eyebrow">{'Write with confidence' if slug == 'index' else 'Vale / ' + label}</p><article>{content}</article>
 <footer><span>Swack Tools · <a href="https://github.com/swack-tools/vale-ai-plugin/blob/main/LICENSE">License</a></span><a href="https://github.com/swack-tools/vale-ai-plugin/blob/main/docs/{slug}.md">Edit this page</a></footer></main></div></body></html>'''
         (output / f'{slug}.html').write_text(page)

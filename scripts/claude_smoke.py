@@ -58,6 +58,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--scope', choices=('user', 'project'), default='user')
     parser.add_argument('--feedback-scope', choices=('changed-files', 'new-findings'), default='changed-files')
+    parser.add_argument('--skill', choices=('check-prose', 'procedural-prose'), default='check-prose')
     args = parser.parse_args()
     requests.clear()
     with temporary_workspace(prefix='vale-claude-smoke-') as tmp:
@@ -80,7 +81,7 @@ def main():
         threading.Thread(target=server.serve_forever, daemon=True).start()
         env['ANTHROPIC_BASE_URL'] = f'http://127.0.0.1:{server.server_port}'
         try:
-            result = subprocess.run(['claude', '-p', '/vale:check-prose smoke.md', '--verbose',
+            result = subprocess.run(['claude', '-p', f'/vale:{args.skill} smoke.md', '--verbose',
                                      '--output-format', 'stream-json', '--dangerously-skip-permissions',
                                      '--max-turns', '8'], cwd=project, env=env,
                                     capture_output=True, text=True, timeout=90)
@@ -95,7 +96,9 @@ def main():
         print(result.stderr[-1500:])
         assert result.returncode == 0, result.returncode
         assert requests, 'Claude did not call the local fixture'
-        assert 'Check technical prose' in json.dumps(requests[0]), 'Claude did not expand the slash command'
+        heading = 'Revise procedures' if args.skill == 'procedural-prose' else 'Check technical prose'
+        assert heading in json.dumps(requests[0]), 'Claude did not expand the selected command or skill'
+        assert 'vale:procedural-prose' in json.dumps(requests[0]), 'Claude did not discover the procedural skill'
         assert any('Google.Latin' in json.dumps(r) for r in requests[1:]), 'Claude did not receive hook feedback'
         if args.feedback_scope == 'new-findings':
             received = json.dumps(requests[1:])

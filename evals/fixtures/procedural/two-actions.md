@@ -1,0 +1,1 @@
+If the service is stopped, verify the backup with `backup verify --id snap_7` and then start the service with `service start`. Both actions require the service to have been stopped before verification.

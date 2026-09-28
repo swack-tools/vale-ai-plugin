@@ -27,6 +27,9 @@ def inspect_environment(root, *, cli_overrides=None):
     try:
         policy = load_policy(root, cli_overrides)
         report['policy'] = asdict(policy)
+        selected = empty_result(root, policy=policy)
+        report['config']['config_path'] = selected.config_path
+        report['coverage'] = asdict(selected.coverage)
     except (OSError, ValueError) as exc:
         report['overall_status'] = 'incomplete'
         report['errors'].append(str(exc))

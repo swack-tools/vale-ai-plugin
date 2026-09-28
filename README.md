@@ -76,6 +76,15 @@ descriptions without checking identifiers. See the
 [configuration recipes](https://vale.swacktech.com/configuration.html) for
 precedence, safe exclusions, vocabulary, and format selection.
 
+## Procedural writing
+
+Use `/vale:procedural-prose` in Claude Code or `$vale:procedural-prose` in Codex
+for runbooks and instructions. This experimental skill preserves conditions,
+commands, and requirement strength. The optional `ste-inspired` profile uses
+the same Google checks. It adds no Simplified Technical English enforcement or certification. See the
+[profile guide](https://vale.swacktech.com/profiles.html) for activation,
+project configuration, examples, rollback, and evaluation limits.
+
 ## Hooks without a marketplace
 
 Clone this repo, then choose a host and scope:

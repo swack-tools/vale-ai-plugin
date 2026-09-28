@@ -41,13 +41,30 @@ the local integration cases with a reason. In CI, or with
 optional markup parser. Keep observed misses and false positives visible when
 updating labels. Don't change labels merely to match the engine.
 
+## Select a suite
+
+| Suite | Cases | Required records | Skill |
+| --- | --- | --- | --- |
+| `google-prose`, the default | 6 | 12 | General technical writing |
+| `procedural-prose` | 7 | 14 | Experimental procedural guidance |
+
+Use `--suite procedural-prose` for both preparation and validation to evaluate
+the procedural skill. Its cases include `review_focus` guidance for the semantic
+reviewer. They aren't additional mechanical-rule labels. Reports include the
+selected `suite`. Records and skill snapshots must match that suite.
+
+```sh
+python3 scripts/evaluate_prose.py --suite procedural-prose --prepare evals/results/procedural-pilot
+python3 scripts/evaluate_prose.py --suite procedural-prose --results evals/results/procedural-pilot --format json
+```
+
 ## Prepare paired trials
 
 ```sh
 python3 scripts/evaluate_prose.py --prepare evals/results/pilot
 ```
 
-Preparation creates a new directory containing `trials.json`, six prompt files,
+For the default suite, preparation creates a new directory containing `trials.json`, six prompt files,
 a snapshot of `google-prose`, and an empty `outputs` directory. It refuses an
 existing destination. It makes no model calls and reads no credentials.
 Use a new directory for every experiment. Keep synthetic inputs in Git and raw
@@ -55,16 +72,16 @@ outputs under ignored `evals/results/`. Don't add user documents, credentials,
 or account transcripts to the corpus or evidence.
 
 Each case has two arms: `baseline` and `skill`. Both receive exactly the same
-prompt from `evals/cases.json`. The skill arm enables only `google-prose`.
+prompt from `evals/cases.json`. The skill arm enables only the selected writing skill.
 Automatic prose hooks stay off in both arms. This isolates the writing
 skill's effect. Testing the combined skill and hooks needs a separate experiment.
 
 Complete this preflight for every arm:
 
 1. Create a fresh client session, home, and temporary workspace. Use unique
-   identifiers for all twelve runs.
+   identifiers for every run.
 2. Verify the same host, client version, model, and model settings in each pair.
-   Use those same values for all six pairs in a pilot. Record settings such as
+   Use those same values for all pairs in the selected suite. Record settings such as
    reasoning effort and temperature when supported.
 3. Check that no inherited instructions, plugins, prose hooks, or writing skills
    affect the baseline. Confirm that both arms have the same other context.
@@ -189,7 +206,7 @@ python3 scripts/evaluate_prose.py --results evals/results/pilot --format json
 
 | Exit | Meaning |
 | --- | --- |
-| `0` | All six pairs have matching metadata, complete reviews, and no literal or semantic failures |
+| `0` | All pairs in the selected suite have matching metadata, complete reviews, and no literal or semantic failures |
 | `1` | Complete reviewed evidence contains a literal or semantic failure |
 | `2` | Evidence is invalid, incomplete, missing, or unreviewed |
 
@@ -198,7 +215,7 @@ output retains per-arm literal and semantic results, reviewer identity, output
 digests, pair consistency, and errors. A successful validation doesn't mean the
 skill improved the baseline. Compare both arms' actual outcomes and report
 regressions as well as improvements. Don't calculate general model accuracy or
-Simplified Technical English (STE) compliance from these six cases or from a model's self-assessment.
+Simplified Technical English (STE) compliance from these cases or from a model's self-assessment.
 
 ## Current evidence
 
@@ -207,8 +224,8 @@ with Vale 3.23.0. Validator regressions demonstrate that changed commands,
 incomplete pairs, contaminated baselines, mismatched models, stale output
 reviews, and missing review dimensions can't pass.
 
-The real-model pilot remains unrun. The current isolated client environments
+Both real-model pilots remain unrun. The current isolated client environments
 have no authorized model session. A normal signed-in client doesn't establish
 an uncontaminated paired experiment. Editorial improvement and semantic
 preservation by the writing skill remain unverified. The harness is ready for
-six matched pairs when isolated authorized model access is available.
+six Google pairs or seven procedural pairs when isolated authorized model access is available. The procedural skill remains experimental. Its [profile guide](profiles.html) explains the workflow and limitations.

@@ -13,6 +13,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 SKILL = 'plugins/vale/skills/google-prose/SKILL.md'
+SUITES = {'google-prose': SKILL, 'procedural-prose': 'plugins/vale/skills/procedural-prose/SKILL.md'}
 CHECKS = ('meaning', 'quantities', 'negation', 'modality', 'prerequisites', 'order',
           'quoted_code', 'rule_references', 'unnecessary_changes')
 PREFLIGHT = ('fresh_session', 'isolated_home', 'isolated_workspace', 'target_skill',
@@ -71,20 +72,21 @@ def read_json(root, name):
         raise ValueError('JSON nesting exceeds the supported parser limit.') from exc
 
 
-def catalog():
-    return {case['case_id']: case for case in read_json(ROOT, 'evals/cases.json')}
+def catalog(suite='google-prose'):
+    return {case['case_id']: case for case in read_json(ROOT, 'evals/cases.json')
+            if case.get('suite', 'google-prose') == suite}
 
 
-def prepare(directory):
+def prepare(directory, suite='google-prose'):
     """Create an unrun template; never overwrite existing evidence."""
     directory.mkdir(parents=True, exist_ok=False)
     (directory / 'prompts').mkdir()
     (directory / 'outputs').mkdir()
     (directory / 'skills').mkdir()
-    skill = read_file(ROOT, SKILL)
-    (directory / 'skills/google-prose.md').write_bytes(skill)
+    skill = read_file(ROOT, SUITES[suite])
+    (directory / f'skills/{suite}.md').write_bytes(skill)
     trials = []
-    for case in catalog().values():
+    for case in catalog(suite).values():
         prompt = read_file(ROOT, case['prompt_file'])
         prompt_file = 'prompts/' + case['case_id'] + '.txt'
         (directory / prompt_file).write_bytes(prompt)
@@ -92,7 +94,7 @@ def prepare(directory):
             trials.append(dict(case_id=case['case_id'], arm=arm, host='', client_version='', model='',
                                timestamp='', session_id='', home='', workspace='', settings={},
                                prompt_file=prompt_file, prompt_sha256=digest(prompt),
-                               skill_file='skills/google-prose.md' if arm == 'skill' else None,
+                               skill_file=f'skills/{suite}.md' if arm == 'skill' else None,
                                skill_sha256=digest(skill) if arm == 'skill' else None,
                                output_file=f"outputs/{case['case_id']}-{arm}.{case['format']}",
                                reviewer=None, semantic_verdict='unreviewed', reviewed_output_sha256=None, notes='',
@@ -133,7 +135,7 @@ def literal_count(source, text, literal):
     return len(re.findall(left + re.escape(literal) + right, text))
 
 
-def inspect_trial(directory, trial, case):
+def inspect_trial(directory, trial, case, suite='google-prose'):
     if set(trial) != TRIAL_FIELDS:
         raise ValueError('Trial fields differ from the prepared schema: ' + ', '.join(sorted(set(trial) ^ TRIAL_FIELDS)))
     for key in ('host', 'client_version', 'model', 'timestamp', 'session_id', 'home', 'workspace'):
@@ -158,7 +160,7 @@ def inspect_trial(directory, trial, case):
         raise ValueError('Prompt hash/content does not match the synthetic case.')
     if trial['arm'] == 'skill':
         skill = read_file(directory, trial.get('skill_file'))
-        if digest(skill) != trial.get('skill_sha256') or skill != read_file(ROOT, SKILL):
+        if digest(skill) != trial.get('skill_sha256') or skill != read_file(ROOT, SUITES[suite]):
             raise ValueError('Skill hash/content does not match this checkout.')
     elif trial.get('skill_file') is not None or trial.get('skill_sha256') is not None:
         raise ValueError('Baseline must not load the target skill.')
@@ -198,17 +200,17 @@ def inspect_trial(directory, trial, case):
                 lint={'status': 'not_run'})
 
 
-def evaluate(directory):
-    report = dict(schema_version=1, status='incomplete', exit_code=2, errors=[], trials=[], pairs=[],
+def evaluate(directory, suite='google-prose'):
+    report = dict(schema_version=1, suite=suite, status='incomplete', exit_code=2, errors=[], trials=[], pairs=[],
                   lint={'status': 'not_run', 'note': 'No lint or model calls are made by the offline validator.'},
                   note='A pass means complete reviewed evidence, not measured editorial improvement or certified compliance.')
     errors = report['errors']
     try:
         directory = directory.resolve()
-        cases = catalog()
+        cases = catalog(suite)
         trials = read_json(directory, 'trials.json')
-        if not isinstance(trials, list) or len(trials) > 12:
-            raise ValueError('trials.json must contain at most 12 records for the six paired cases.')
+        if not isinstance(trials, list) or len(trials) > 2 * len(cases):
+            raise ValueError(f'trials.json must contain at most {2 * len(cases)} records for the {len(cases)} paired cases.')
     except (OSError, ValueError, TypeError, RuntimeError) as exc:
         errors.append(str(exc))
         return report
@@ -223,10 +225,10 @@ def evaluate(directory):
             if key in grouped:
                 raise ValueError('Duplicate case/arm.')
             grouped[key] = trial
-            result = inspect_trial(directory, trial, cases[trial['case_id']])
+            result = inspect_trial(directory, trial, cases[trial['case_id']], suite)
             observed_settings = json.dumps({k: trial[k] for k in ('host', 'client_version', 'model', 'settings')}, sort_keys=True)
             if pilot_settings is not None and observed_settings != pilot_settings:
-                errors.append('One pilot must use the same host, client, model, and settings for all six pairs.')
+                errors.append('One pilot must use the same host, client, model, and settings for all pairs.')
             pilot_settings = observed_settings
             for field, seen in unique.items():
                 value = trial[field]
@@ -258,18 +260,19 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument('--results', type=Path, help='Directory containing trials.json and evidence files.')
-    mode.add_argument('--prepare', type=Path, help='Create a new, unrun six-pair template.')
+    mode.add_argument('--prepare', type=Path, help='Create a new, unrun paired-trial template.')
+    parser.add_argument('--suite', choices=tuple(SUITES), default='google-prose', help='Select the skill and case catalog.')
     parser.add_argument('--format', choices=('text', 'json'), default='text')
     args = parser.parse_args()
     if args.prepare:
         try:
-            prepare(args.prepare)
+            prepare(args.prepare, args.suite)
         except (OSError, ValueError) as exc:
             print('Cannot prepare evaluation: ' + str(exc), file=sys.stderr)
             return 2
         print('Created unrun evaluation template at ' + str(args.prepare))
         return 0
-    report = evaluate(args.results)
+    report = evaluate(args.results, args.suite)
     if args.format == 'json':
         print(json.dumps(report, indent=2))
     else:

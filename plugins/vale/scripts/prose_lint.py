@@ -247,6 +247,7 @@ def run_hook(payload, *, deadline=None, scope=None, cli_overrides=None):
         raise ValueError('Hook input requires session_id and cwd.')
     active = payload.get('stop_hook_active') is True
     root = Path(cwd_value).absolute()
+    policy = None
     try:
         deadline.check()
         root = workspace(root.resolve(strict=True), deadline=deadline)
@@ -285,7 +286,7 @@ def run_hook(payload, *, deadline=None, scope=None, cli_overrides=None):
                 return {'systemMessage': render_text(result, 16000)}
             return {}
     except (OSError, ValueError, RuntimeError, subprocess.TimeoutExpired) as error:
-        result = empty_result(root)
+        result = empty_result(root, policy=policy)
         result.errors.append(Issue('hook_error', str(error)))
         return feedback(event, result.finish(), active, root=root, session=session)
 
@@ -317,7 +318,7 @@ def main():
         patterns.add_argument('--' + name, action='append', help=f'Replace project {name} patterns; repeat for more patterns.')
         patterns.add_argument('--clear-' + name, dest=name, action='store_const', const=[],
                               help=f'Override the project {name} list with an empty list.')
-    parser.add_argument('--profile', choices=('auto', 'google'))
+    parser.add_argument('--profile', choices=selection_policy.PROFILES)
     args = parser.parse_args()
     overrides = {key: getattr(args, key) for key in ('scope', 'include', 'exclude', 'profile')}
     if args.base_ref is not None and (not args.check or args.scope == 'changed-files'):
@@ -358,6 +359,7 @@ def main():
             path = Path(name).absolute()
             names.append(str(path.relative_to(root)) if path.is_relative_to(root) else str(path))
         deadline = Deadline(50)
+        policy = None
         try:
             policy = selection_policy.load_policy(root, overrides)
             scope = 'changed-files' if args.all else policy.scope
@@ -369,7 +371,7 @@ def main():
                 names = sorted(snapshot(root, deadline=deadline, policy=policy))
             result = scoped_check(root, names, deadline=deadline, scope=scope, revision=args.base_ref, policy=policy)
         except (OSError, ValueError, RuntimeError, subprocess.TimeoutExpired) as exc:
-            result = empty_result(root, names)
+            result = empty_result(root, names, policy)
             result.errors.append(Issue('check_error', str(exc)))
             result.finish()
         print(result.to_json() if args.format == 'json' else render_text(result))

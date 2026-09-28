@@ -37,14 +37,18 @@ def eligible(root, name, policy=None):
     return path_issue(root, name, policy) is None
 
 
-def configuration(root):
+def configuration(root, policy=None):
     override = root / '.vale.ini'
-    return override if override.is_file() else PACKAGE / '.vale.ini'
+    if override.is_file():
+        return override
+    if policy is not None and policy.profile == 'ste-inspired':
+        return PACKAGE / 'profiles/ste-inspired.ini'
+    return PACKAGE / '.vale.ini'
 
 
-def empty_result(root, names=()):
-    config = configuration(root)
-    source = 'bundled' if config == PACKAGE / '.vale.ini' else 'project'
+def empty_result(root, names=(), policy=None):
+    config = configuration(root, policy)
+    source = 'project' if config == root / '.vale.ini' else 'bundled'
     coverage = Coverage(source, 'configured_invocation' if source == 'bundled' else 'unknown',
                         'Submitted operands are not proof of matched rules; an empty Vale result can also mean no matching configuration.')
     return CheckResult(1, 'skipped', str(config), list(names), [], [], [], [], coverage)
@@ -97,6 +101,7 @@ def run_check(root, names, *, deadline=None, documents=None, policy=None):
     except (OSError, ValueError) as exc:
         result.errors.append(Issue("policy_error", str(exc)))
         return result.finish()
+    result = empty_result(root, names, policy)
     if not names:
         return result
     paths, aliases = [], []
@@ -136,7 +141,7 @@ def check_document(root, text, logical_path, *, deadline=None, policy=None):
     deadline = deadline or Deadline(50)
     policy = policy or load_policy(root)
     name = str(logical_path)
-    result = empty_result(root, [name])
+    result = empty_result(root, [name], policy)
     path = root / name
     if (not path.is_absolute() or not path.is_relative_to(root) or '..' in path.parts or
             not policy.supports(name) or not policy.selected(name) or

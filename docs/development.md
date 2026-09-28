@@ -206,3 +206,20 @@ pairs, record isolated runs, and review technical meaning. The offline validator
 checks evidence completeness and protected literals. It doesn't judge writing
 quality or call a model. The real-model pilot remains unrun, so editorial
 effectiveness remains an open evaluation question.
+
+## Procedural skill discovery
+
+The native fixtures also assert that the procedural skill is available. Exercise
+its explicit invocation with either client:
+
+```sh
+python3 scripts/codex_smoke.py --plugin --skill procedural-prose
+python3 scripts/claude_smoke.py --skill procedural-prose
+```
+
+These local model fixtures verify client integration. They don't measure writing
+quality. Use the [paired evaluation](evaluation.html) for that separate task.
+
+Hosted native jobs invoke `check-prose` in full-file mode and
+`procedural-prose` in new-findings mode for both clients. Both modes still
+verify hook feedback and the correction pass.

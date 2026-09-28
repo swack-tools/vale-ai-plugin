@@ -11,6 +11,7 @@ EXTENSIONS = set('.md .mdx .txt .rst .adoc .html .rs .py .sh .pl .js .jsx .ts .t
 HARD_EXCLUDED = {'.git', '.codex', '.claude', '.agents'}
 SOFT_EXCLUDED = {'.venv', 'node_modules', 'target', 'dist', 'build', '.vale', 'vendor', '__pycache__'}
 EXCLUDED = HARD_EXCLUDED | SOFT_EXCLUDED
+PROFILES = ('auto', 'google', 'ste-inspired')
 MAX_POLICY_BYTES = 65536
 MAX_VALE_CONFIG_BYTES = 8 * 1024 * 1024
 
@@ -73,7 +74,7 @@ def validate(values):
             if type(value) is not int or value != 1:
                 raise ValueError('schema_version must be the integer 1.')
         elif key in ('scope', 'profile'):
-            choices = ('changed-files', 'new-findings') if key == 'scope' else ('auto', 'google')
+            choices = ('changed-files', 'new-findings') if key == 'scope' else PROFILES
             if not isinstance(value, str) or value not in choices:
                 raise ValueError(f'{key} must be one of: ' + ', '.join(choices))
         else:
@@ -97,8 +98,8 @@ def load_policy(root, cli_overrides=None):
         defaults.update(values)
         origins.update({key: source for key in values})
     config = root / '.vale.ini'
-    if defaults['profile'] == 'google' and (config.exists() or config.is_symlink()):
-        raise ValueError('profile=google conflicts with the root .vale.ini; use profile=auto or remove the root configuration.')
+    if defaults['profile'] != 'auto' and (config.exists() or config.is_symlink()):
+        raise ValueError(f"profile={defaults['profile']} conflicts with the root .vale.ini; use profile=auto or remove the root configuration.")
     formats, views = {}, {}
     if defaults['include'] and config.is_file():
         ini = configparser.ConfigParser(interpolation=None, strict=False)

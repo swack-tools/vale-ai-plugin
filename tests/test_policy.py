@@ -88,7 +88,7 @@ class PolicyTests(unittest.TestCase):
                      'include = "*.md"', 'include = [1]', 'include = ["../*.md"]',
                      'include = ["/tmp/*"]', 'include = ["C:/docs/*"]',
                      'include = ["docs/../*.md"]', 'include = ["docs\\\\*.md"]',
-                     'profile = "ste-inspired"'):
+                     'profile = "unknown-profile"'):
             with self.subTest(text=text):
                 self.policy(text)
                 code, result = self.cli('--doctor')

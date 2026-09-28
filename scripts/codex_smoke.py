@@ -57,6 +57,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--plugin', action='store_true', help='Install the repository marketplace instead of project hooks.')
     parser.add_argument('--feedback-scope', choices=('changed-files', 'new-findings'), default='changed-files')
+    parser.add_argument('--skill', choices=('check-prose', 'procedural-prose'), default='check-prose')
     args = parser.parse_args()
     requests.clear()
     with temporary_workspace(prefix='vale-codex-smoke-') as tmp:
@@ -94,7 +95,7 @@ trust_level = "trusted"
         try:
             result = subprocess.run(['codex', 'exec', '--ephemeral', '--dangerously-bypass-hook-trust',
                                      '-C', str(project), '-s', 'danger-full-access', '--json',
-                                     ('$vale:check-prose smoke.md. Run the deterministic hook fixture.' if args.plugin else
+                                     (f'$vale:{args.skill} smoke.md. Run the deterministic hook fixture.' if args.plugin else
                                       'Run the supplied deterministic hook fixture.')],
                                     env=env, capture_output=True, text=True, timeout=90)
         finally:
@@ -110,6 +111,10 @@ trust_level = "trusted"
         if args.plugin:
             assert 'vale:check-prose' in json.dumps(requests[0]), 'Codex did not discover the checking skill'
             assert 'vale:google-prose' in json.dumps(requests[0]), 'Codex did not discover the writing skill'
+        if args.plugin:
+            assert 'vale:procedural-prose' in json.dumps(requests[0]), 'Codex did not discover the procedural skill'
+            if args.skill == 'procedural-prose':
+                assert 'Revise procedures' in json.dumps(requests[0]), 'Codex did not expand the procedural skill'
         assert any('Google.Latin' in json.dumps(r) for r in requests[1:]), 'Codex did not receive Vale feedback'
         if args.feedback_scope == 'new-findings':
             received = json.dumps(requests[1:])

@@ -115,11 +115,11 @@ an incomplete check. The policy file must be a regular file of at most 64 KiB.
 | `scope` | `changed-files` checks selected files in full. `new-findings` enables conservative comparison. |
 | `include` | An empty list preserves default selection. A nonempty list replaces it. |
 | `exclude` | Removes matching paths after inclusion. |
-| `profile` | `auto` uses root `.vale.ini` when present, otherwise bundled Google. `google` requires the bundled configuration. |
+| `profile` | `auto` uses root `.vale.ini` when present, otherwise bundled Google. `google` requires the bundled configuration. `ste-inspired` uses the same Google checks for the optional procedural workflow. |
 
-Selecting `google` while a root `.vale.ini` exists produces a conflict. Use
+Selecting `google` or `ste-inspired` while a root `.vale.ini` exists produces a conflict. Use
 `auto` to keep the project configuration, or remove that configuration when
-switching to bundled rules. The wrapper never merges the two configurations.
+switching to bundled rules. The wrapper never merges the two configurations. The [profile guide](profiles.html) explains skill activation and rollback.
 
 Patterns use Python's `fnmatchcase` on paths relative to the root, with `/` as
 the separator. Matching is case-sensitive. `*` can cross `/`, so `docs/*.md`
