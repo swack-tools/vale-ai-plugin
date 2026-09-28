@@ -36,6 +36,7 @@ jobs:
           echo "GEM_HOME=$RUNNER_TEMP/gems" >> "$GITHUB_ENV"
           echo "$RUNNER_TEMP/gem-bin" >> "$GITHUB_PATH"
       - name: Test hooks and installers
+        shell: bash
         env:
           VALE_REQUIRE_PARSERS: '1'
         run: python -m unittest discover -s tests -v 2>&1 | tee test-results.log
