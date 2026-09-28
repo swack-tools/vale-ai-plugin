@@ -46,9 +46,15 @@ class CheckResult:
     comparison: dict | None = None
 
     def finish(self):
-        self.status = ('incomplete' if self.errors else 'findings' if self.findings else
+        self.status = ('incomplete' if self.errors else 'findings' if self.actionable_findings else
                        'clean' if self.submitted_files else 'skipped')
         return self
+
+    @property
+    def actionable_findings(self):
+        if self.comparison is None:
+            return self.findings
+        return [self.findings[i] for i in self.comparison['actionable_indexes']]
 
     @property
     def exit_code(self):
@@ -66,8 +72,13 @@ def one_line(value):
 def render_text(result, limit=None, *, prefix='', suffix='', report_path=None):
     """Render only whole entries; count metadata and adapter copy in the budget."""
     entries = [f'{one_line(f.path)}:{f.line}:{f.column}:{one_line(f.rule)}:{one_line(f.message)}'
-               for f in result.findings]
+               for f in result.actionable_findings]
     errors = [f'Vale could not complete the check: {one_line(e.message)}' for e in result.errors]
+    if result.comparison is not None:
+        c = result.comparison
+        errors.append(f"Comparison: {c['new']} new/actionable, {c['existing']} existing, {c['resolved']} unmatched baseline findings.")
+        if c['fallback_reason']:
+            errors.append('Comparison fallback (full-file findings remain actionable): ' + one_line(c['fallback_reason']))
     skips = [f'Skipped {one_line(e.path)}: {one_line(e.message)}' for e in result.skipped_files]
     if limit is None:
         if not entries and not errors and not skips:

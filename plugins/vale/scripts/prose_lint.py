@@ -228,7 +228,7 @@ def feedback(event, result, active=False, *, root=None, session=None):
     return {'systemMessage': text}
 
 
-def run_hook(payload, *, deadline=None):
+def run_hook(payload, *, deadline=None, scope="changed-files"):
     deadline = deadline or Deadline(50)
     if not isinstance(payload, dict):
         raise ValueError('Hook input must be a JSON object.')
@@ -252,6 +252,10 @@ def run_hook(payload, *, deadline=None):
                        if data['files'] is not None else set())
             if event == 'PreToolUse':
                 data['files'] = current
+                if scope == 'new-findings':
+                    import baseline
+                    directory = baseline.session_directory(state_directory(root, deadline=deadline), session)
+                    baseline.capture(directory, root, current, deadline)
                 return {}
             if event == 'PostToolUse':
                 changed |= direct_paths(payload, root, Path(cwd_value).resolve()) & current.keys()
@@ -261,10 +265,16 @@ def run_hook(payload, *, deadline=None):
             data['files'] = current
             data['touched'] = sorted(touched)
             data['pending'] = sorted(pending | selected)
-            result = run_check(root, sorted(selected), deadline=deadline)
+            directory = None
+            if scope == 'new-findings':
+                import baseline
+                directory = baseline.session_directory(state_directory(root, deadline=deadline), session)
+            result = scoped_check(root, sorted(selected), deadline=deadline, scope=scope, directory=directory)
             data['pending'] = sorted((pending | selected) - set(result.submitted_files))
             if result.status in {'findings', 'incomplete'}:
                 return feedback(event, result, active, root=root, session=session)
+            if result.comparison and result.comparison['fallback_reason']:
+                return {'systemMessage': render_text(result, 16000)}
             return {}
     except (OSError, ValueError, RuntimeError, subprocess.TimeoutExpired) as error:
         result = empty_result(root)
@@ -272,14 +282,34 @@ def run_hook(payload, *, deadline=None):
         return feedback(event, result.finish(), active, root=root, session=session)
 
 
+
+def scoped_check(root, names, *, deadline, scope='changed-files', directory=None, revision=None):
+    if scope == 'changed-files' or (not names and revision is None):
+        return run_check(root, names, deadline=deadline)
+    import baseline
+    try:
+        policy = baseline.policy_identity(root, deadline)
+    except (OSError, ValueError, RuntimeError):
+        policy = None
+    documents = {}
+    result = run_check(root, names, deadline=deadline, documents=documents)
+    return baseline.compare(root, result, documents, policy, directory=directory, revision=revision, deadline=deadline)
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument('--check', nargs='+', metavar='FILE', help='Check named files without a hook event.')
+    mode.add_argument('--all', action='store_true', help='Check all eligible workspace files.')
     mode.add_argument('--doctor', action='store_true', help='Inspect the engine, configuration, and parser readiness.')
     parser.add_argument('--format', choices=('text', 'json'), default='text')
+    parser.add_argument('--scope', choices=('changed-files', 'new-findings'), default='changed-files')
+    parser.add_argument('--base-ref', help='Git commit or ref for manual new-findings checks.')
     args = parser.parse_args()
-    if args.check or args.doctor:
+    if args.base_ref is not None and (not args.check or args.scope != 'new-findings'):
+        parser.error('--base-ref requires --check and --scope new-findings.')
+    if args.scope == 'new-findings' and (args.all or args.doctor or (args.check and args.base_ref is None)):
+        parser.error('Manual new-findings requires --check FILE... --base-ref REV; --all and --doctor do not compare.')
+    if args.check or args.all or args.doctor:
         root = Path.cwd()
         try:
             root = workspace(root.resolve())
@@ -295,7 +325,7 @@ def main():
                 report['errors'].append(note)
                 print(json.dumps(report) if args.format == 'json' else render_diagnostics(report))
             else:
-                result = empty_result(root, args.check)
+                result = empty_result(root, args.check or [])
                 result.config_path = ''
                 result.coverage.verification = 'unknown'
                 result.coverage.note = note
@@ -309,14 +339,22 @@ def main():
             print(json.dumps(report) if args.format == 'json' else render_diagnostics(report))
             return 2 if report['overall_status'] == 'incomplete' else 0
         names = []
-        for name in args.check:
+        for name in args.check or []:
             path = Path(name).absolute()
             names.append(str(path.relative_to(root)) if path.is_relative_to(root) else str(path))
-        result = run_check(root, names)
+        deadline = Deadline(50)
+        try:
+            if args.all:
+                names = sorted(snapshot(root, deadline=deadline))
+            result = scoped_check(root, names, deadline=deadline, scope=args.scope, revision=args.base_ref)
+        except (OSError, ValueError, RuntimeError, subprocess.TimeoutExpired) as exc:
+            result = empty_result(root, names)
+            result.errors.append(Issue('check_error', str(exc)))
+            result.finish()
         print(result.to_json() if args.format == 'json' else render_text(result))
         return result.exit_code
     try:
-        result = run_hook(json.load(sys.stdin))
+        result = run_hook(json.load(sys.stdin), scope=args.scope)
     except (ValueError, OSError) as error:
         print(f'Vale: invalid hook input: {error}', file=sys.stderr)
         return 1
