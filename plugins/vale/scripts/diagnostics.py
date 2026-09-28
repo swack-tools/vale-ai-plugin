@@ -9,7 +9,7 @@ import time
 from vale_runner import EXTENSIONS, empty_result
 
 
-def inspect_environment(root):
+def empty_diagnostics(root):
     initial = empty_result(root)
     vale = shutil.which('vale')
     report = dict(schema_version=1, overall_status='ready',
@@ -18,6 +18,12 @@ def inspect_environment(root):
                   formats={}, errors=[], coverage=asdict(initial.coverage),
                   installation={'activation': 'unknown', 'project_files': []},
                   workspace=str(root))
+    return report
+
+
+def inspect_environment(root):
+    report = empty_diagnostics(root)
+    vale = report['executable']['path']
     for name in ('.codex/hooks.json', '.claude/settings.json'):
         if (root / name).is_file():
             report['installation']['project_files'].append(name)
@@ -38,7 +44,7 @@ def inspect_environment(root):
         report['executable']['version'] = '.'.join(match.groups())
         if tuple(map(int, match.groups())) < (3, 23, 0):
             raise RuntimeError('Vale 3.23 or later is required.')
-        config = subprocess.run([vale, '--no-global', '--config', initial.config_path, 'ls-config'],
+        config = subprocess.run([vale, '--no-global', '--config', report['config']['config_path'], 'ls-config'],
                                 cwd=root, capture_output=True, text=True,
                                 timeout=min(5, max(0.001, end-time.monotonic())))
         if config.returncode or config.stderr.strip():

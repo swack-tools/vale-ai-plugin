@@ -93,6 +93,38 @@ class ResultTests(unittest.TestCase):
         self.assertEqual(len(result['submitted_files']), 50)
         self.assertTrue(result['errors'])
 
+    def test_malformed_alert_preserves_valid_neighbors(self):
+        alerts = [ALERT, {'Check': 'broken'}, dict(ALERT, Line=2)]
+        self.fake_vale(f'print(json.dumps({{sys.argv[-1]: {alerts!r}}}))')
+        code, result = self.check()
+        self.assertEqual(code, 2)
+        self.assertEqual([f['line'] for f in result['findings']], [1, 2])
+        self.assertTrue(result['errors'])
+        self.assertEqual(result['submitted_files'], [])
+
+    def test_excluded_operand_is_skipped(self):
+        excluded = self.root / 'vendor/f.md'
+        excluded.parent.mkdir()
+        excluded.write_text('Use this file.\n')
+        code, result = self.check('vendor/f.md')
+        self.assertEqual(code, 2)
+        self.assertEqual(result['status'], 'skipped')
+        self.assertEqual(result['errors'], [])
+        self.assertEqual(result['skipped_files'][0]['path'], 'vendor/f.md')
+        self.assertTrue(result['skipped_files'][0]['message'])
+        self.file.write_text('Use this file.\n')
+        code, result = self.check('vendor/f.md', self.file.name)
+        self.assertEqual(code, 0)
+        self.assertEqual(result['status'], 'clean')
+        self.assertEqual(result['submitted_files'], [self.file.name])
+        self.assertEqual(len(result['skipped_files']), 1)
+        # A skip-only request does not need an engine, but missing files are invalid.
+        self.env['PATH'] = str(self.root / 'absent-bin')
+        code, result = self.check('vendor/f.md')
+        self.assertEqual(result['status'], 'skipped')
+        code, result = self.check('vendor/missing.md')
+        self.assertEqual(result['status'], 'incomplete')
+
     def test_invalid_operand_does_not_discard_valid_findings(self):
         code, result = self.check(self.file.name, 'missing.md')
         self.assertEqual(code, 2)

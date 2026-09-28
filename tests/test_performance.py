@@ -82,6 +82,35 @@ class PerformanceTests(unittest.TestCase):
         self.assertIn('could not complete', response['hookSpecificOutput']['additionalContext'])
         self.assertEqual(before, self.state.read_bytes())
 
+    def test_state_missing_snapshot_is_incomplete(self):
+        self.directory.mkdir()
+        self.state.write_text(json.dumps(dict(schema_version=1, touched=[], pending=[])))
+        before = self.state.read_bytes()
+        response = self.event('PreToolUse')
+        self.assertIn('could not complete', response['systemMessage'])
+        self.assertIn('state', response['systemMessage'].lower())
+        self.assertEqual(before, self.state.read_bytes())
+
+    def test_cli_discovery_failure_is_structured(self):
+        import io
+        from contextlib import redirect_stdout
+        for mode in (['--check', 'guide.md'], ['--doctor']):
+            with self.subTest(mode=mode), patch.object(sys, 'argv', ['prose_lint', '--format', 'json', *mode]), patch.object(hook, 'workspace', side_effect=hook.DeadlineExceeded('discovery timed out')):
+                output = io.StringIO()
+                with redirect_stdout(output):
+                    code = hook.main()
+                report = json.loads(output.getvalue())
+                self.assertEqual(code, 2)
+                self.assertEqual(report.get('status', report.get('overall_status')), 'incomplete')
+                self.assertTrue(report['errors'])
+
+    def test_direct_fallback_normalizes_after_symlink_validation(self):
+        (self.root / 'docs').mkdir()
+        self.file.write_text('We will use this file.\n')
+        result = self.event('PostToolUse', tool_name='Write', tool_input={'file_path': 'docs/../guide.md'})
+        self.assertIn('hookSpecificOutput', result)
+        self.assertEqual(json.loads(self.state.read_text())['touched'], ['guide.md'])
+
     def test_lock_timeout_retains_state(self):
         module = self.deadline_module()
         self.event('PreToolUse')
@@ -158,6 +187,40 @@ print(json.dumps(prose_lint.run_hook(dict(hook_event_name='PostToolUse',session_
             for proc in processes:
                 if proc.poll() is None: proc.kill(); proc.wait()
         self.assertEqual(set(json.loads(self.state.read_text())['touched']), {'a.md', 'b.md'})
+
+    def test_simultaneous_pre_initializes_only_once(self):
+        code = """import json,sys,time
+from pathlib import Path
+sys.path.insert(0,sys.argv[1])
+import prose_lint
+root=Path(sys.argv[2]); name=sys.argv[3]
+original=prose_lint.snapshot
+def snapshot(*args, **kwargs):
+    with (root/'.git/scans').open('a') as out: out.write(name+'\\n')
+    return original(*args, **kwargs)
+prose_lint.snapshot=snapshot
+(root/('.git/'+name+'.ready')).touch()
+while not (root/'.git/go').exists(): time.sleep(.01)
+print(json.dumps(prose_lint.run_hook(dict(hook_event_name='PreToolUse',session_id='perf',cwd=str(root),tool_name='Read'))))
+"""
+        processes = [subprocess.Popen([sys.executable, '-c', code, str(SCRIPTS), str(self.root), name],
+                                      stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                     for name in ('a', 'b')]
+        try:
+            end = time.monotonic() + 3
+            while len(list((self.root / '.git').glob('*.ready'))) < 2 and time.monotonic() < end:
+                time.sleep(.01)
+            self.assertEqual(len(list((self.root / '.git').glob('*.ready'))), 2)
+            (self.root / '.git/go').touch()
+            for proc in processes:
+                stdout, stderr = proc.communicate(timeout=5)
+                self.assertEqual(proc.returncode, 0, stderr)
+                self.assertEqual(json.loads(stdout), {})
+        finally:
+            for proc in processes:
+                if proc.poll() is None: proc.kill(); proc.wait()
+        self.assertEqual(len((self.root / '.git/scans').read_text().splitlines()), 1)
+        self.assertIn('guide.md', json.loads(self.state.read_text())['files'])
 
     def test_separate_sessions_do_not_block_each_other(self):
         module = self.deadline_module()

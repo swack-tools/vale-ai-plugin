@@ -14,13 +14,26 @@ MAX_FILES = 20000
 MAX_BYTES = 1024 * 1024
 
 
-def eligible(root, name):
+def path_issue(root, name):
     path = root / name
-    if path.suffix.lower() not in EXTENSIONS or set(Path(name).parts) & EXCLUDED:
-        return False
     if path.is_symlink() or any(p.is_symlink() for p in path.parents):
+        return Issue('unsupported_path', 'Symbolic links are not checked.', name)
+    if not path.is_file() or not path.resolve().is_relative_to(root):
+        return Issue('unsupported_path', 'File is missing, is not a regular file, or is outside the workspace.', name)
+    if set(Path(name).parts) & EXCLUDED:
+        return Issue('excluded_path', 'File is in an excluded directory.', name)
+    if path.suffix.lower() not in EXTENSIONS:
+        return Issue('unsupported_path', 'File extension is not supported.', name)
+    return None
+
+
+def eligible(root, name):
+    # Filter snapshot candidates before filesystem calls. Explicit operands use
+    # path_issue directly so invalid requests stay distinct from policy skips.
+    path = Path(name)
+    if path.suffix.lower() not in EXTENSIONS or set(path.parts) & EXCLUDED:
         return False
-    return path.is_file() and path.resolve().is_relative_to(root)
+    return path_issue(root, name) is None
 
 
 def configuration(root):
@@ -40,31 +53,39 @@ def decode_findings(stdout, known_paths):
     data = json.loads(stdout)
     if not isinstance(data, dict):
         raise ValueError('Vale JSON must be a path-to-alerts object.')
-    findings = []
+    findings, issues = [], []
     for path, alerts in data.items():
         if path not in known_paths or not isinstance(alerts, list):
-            raise ValueError('Vale returned an unexpected path or malformed alert list.')
+            issues.append(Issue('invalid_alert', 'Vale returned an unexpected path or malformed alert list.'))
+            continue
         for alert in alerts:
-            if not isinstance(alert, dict):
-                raise ValueError('Vale returned a malformed alert.')
-            for key in ('Check', 'Message', 'Match', 'Severity'):
-                if not isinstance(alert.get(key), str):
-                    raise ValueError(f'Vale alert has an invalid {key}.')
-            span = alert.get('Span')
-            line = alert.get('Line')
-            if (type(line) is not int or line < 1 or not isinstance(span, list) or len(span) != 2 or
-                    any(type(x) is not int or x < 1 for x in span) or span[1] < span[0]):
-                raise ValueError('Vale returned an invalid source location.')
-            suggestions = alert.get('Suggestions') or []
-            action = alert.get('Action') or None
-            link = alert.get('Link') or None
-            if (not isinstance(suggestions, list) or any(not isinstance(x, str) for x in suggestions) or
-                    (action is not None and not isinstance(action, dict)) or
-                    (link is not None and not isinstance(link, str))):
-                raise ValueError('Vale returned malformed suggestion metadata.')
-            findings.append(Finding(known_paths[path], line, span[0], span[1], alert['Check'],
-                                    alert['Severity'], alert['Message'], alert['Match'], link, suggestions, action))
-    return findings
+            try:
+                findings.append(decode_alert(alert, known_paths[path]))
+            except ValueError as exc:
+                issues.append(Issue('invalid_alert', str(exc), known_paths[path]))
+    return findings, issues
+
+
+def decode_alert(alert, path):
+    if not isinstance(alert, dict):
+        raise ValueError('Vale returned a malformed alert.')
+    for key in ('Check', 'Message', 'Match', 'Severity'):
+        if not isinstance(alert.get(key), str):
+            raise ValueError(f'Vale alert has an invalid {key}.')
+    span = alert.get('Span')
+    line = alert.get('Line')
+    if (type(line) is not int or line < 1 or not isinstance(span, list) or len(span) != 2 or
+            any(type(x) is not int or x < 1 for x in span) or span[1] < span[0]):
+        raise ValueError('Vale returned an invalid source location.')
+    suggestions = alert.get('Suggestions') or []
+    action = alert.get('Action') or None
+    link = alert.get('Link') or None
+    if (not isinstance(suggestions, list) or any(not isinstance(x, str) for x in suggestions) or
+            (action is not None and not isinstance(action, dict)) or
+            (link is not None and not isinstance(link, str))):
+        raise ValueError('Vale returned malformed suggestion metadata.')
+    return Finding(path, line, span[0], span[1], alert['Check'],
+                   alert['Severity'], alert['Message'], alert['Match'], link, suggestions, action)
 
 
 def run_check(root, names, *, deadline=None):
@@ -72,16 +93,13 @@ def run_check(root, names, *, deadline=None):
     result = empty_result(root, names)
     if not names:
         return result
-    vale = shutil.which('vale')
-    if not vale:
-        result.errors.append(Issue('missing_vale', 'Vale is missing from PATH. Install Vale 3.23 or later, then restart your coding agent.'))
-        return result.finish()
     paths, aliases = [], []
     for name in sorted(set(names)):
         try:
             deadline.check()
-            if not eligible(root, name):
-                result.errors.append(Issue('unsupported_path', f'Unsupported file or path outside the workspace: {name}', name))
+            problem = path_issue(root, name)
+            if problem:
+                (result.skipped_files if problem.code == 'excluded_path' else result.errors).append(problem)
                 continue
             path = (root / name).resolve()
             if path.stat().st_size > MAX_BYTES:
@@ -93,6 +111,12 @@ def run_check(root, names, *, deadline=None):
                 paths.append((name, path))
         except OSError as exc:
             result.errors.append(Issue('file_error', str(exc), name))
+    if not paths and not aliases:
+        return result.finish()
+    vale = shutil.which('vale')
+    if not vale:
+        result.errors.append(Issue('missing_vale', 'Vale is missing from PATH. Install Vale 3.23 or later, then restart your coding agent.'))
+        return result.finish()
     jobs = [(paths[i:i+50], None) for i in range(0, len(paths), 50)]
     jobs += [([pair], str(pair[1].with_suffix(pair[1].suffix.lower()))) for pair in aliases]
     for batch, logical in jobs:
@@ -110,13 +134,15 @@ def run_check(root, names, *, deadline=None):
                 command += ['--', *(str(path) for name, path in batch)]
             proc = run_process(command, input=content, cwd=root, deadline=deadline, timeout=20)
             try:
-                found = decode_findings(proc.stdout, mapping)
+                found, issues = decode_findings(proc.stdout, mapping)
             except (ValueError, TypeError) as exc:
                 raise RuntimeError((proc.stderr or proc.stdout).strip() or str(exc)) from exc
             result.findings.extend(found)
+            result.errors.extend(issues)
             if proc.stderr.strip() or proc.returncode not in (0, 1) or (proc.returncode and not found):
                 raise RuntimeError(proc.stderr.strip() or f'Vale exited with status {proc.returncode}.')
-            result.submitted_files.extend(name for name, path in batch)
+            if not issues:
+                result.submitted_files.extend(name for name, path in batch)
         except (OSError, ValueError, RuntimeError, subprocess.TimeoutExpired) as exc:
             for name, path in batch:
                 result.errors.append(Issue('engine_error', str(exc), name))

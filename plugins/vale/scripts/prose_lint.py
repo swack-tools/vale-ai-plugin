@@ -88,7 +88,7 @@ def direct_paths(payload, root, cwd):
         except ValueError:
             continue
         if eligible(root, relative):
-            selected.add(relative)
+            selected.add(str(path.resolve().relative_to(root)))
     return selected
 
 
@@ -110,7 +110,9 @@ def validate_state(data):
     version = data.get('schema_version', 0)
     if type(version) is not int or version not in (0, 1):
         raise RuntimeError('Unknown Vale state schema; use a compatible plugin or restart with new state.')
-    files = data.get('files')
+    if 'files' not in data:
+        raise RuntimeError('Invalid Vale state: missing snapshot; stop the session before removing its state file.')
+    files = data['files']
     if files is not None and not isinstance(files, dict):
         raise RuntimeError('Invalid Vale snapshot.')
     for collection in (data.get('touched'), data.get('pending', [])):
@@ -259,7 +261,29 @@ def main():
     parser.add_argument('--format', choices=('text', 'json'), default='text')
     args = parser.parse_args()
     if args.check or args.doctor:
-        root = workspace(Path.cwd().resolve())
+        root = Path.cwd()
+        try:
+            root = workspace(root.resolve())
+        except (OSError, ValueError, RuntimeError, subprocess.TimeoutExpired) as exc:
+            note = 'Workspace discovery failed: ' + str(exc)
+            if args.doctor:
+                from diagnostics import empty_diagnostics, render_diagnostics
+                report = empty_diagnostics(root)
+                report['overall_status'] = 'incomplete'
+                report['config']['config_path'] = None
+                report['coverage']['verification'] = 'unknown'
+                report['coverage']['note'] = note
+                report['errors'].append(note)
+                print(json.dumps(report) if args.format == 'json' else render_diagnostics(report))
+            else:
+                result = empty_result(root, args.check)
+                result.config_path = ''
+                result.coverage.verification = 'unknown'
+                result.coverage.note = note
+                result.errors.append(Issue('workspace_error', note))
+                result.finish()
+                print(result.to_json() if args.format == 'json' else render_text(result))
+            return 2
         if args.doctor:
             from diagnostics import inspect_environment, render_diagnostics
             report = inspect_environment(root)
