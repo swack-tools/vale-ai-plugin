@@ -7,7 +7,7 @@ import markdown
 
 ROOT = Path(__file__).resolve().parents[1]
 PAGES = [('index', 'Overview'), ('features', 'Feature guide'), ('installation', 'Installation'), ('usage', 'Commands and skills'), ('marketplaces', 'Marketplaces'), ('behavior', 'How it works'),
-         ('configuration', 'Configuration'), ('troubleshooting', 'Troubleshooting'), ('development', 'Development')]
+         ('configuration', 'Configuration'), ('troubleshooting', 'Troubleshooting'), ('development', 'Development'), ('evaluation', 'Writing evaluation')]
 
 
 def main():

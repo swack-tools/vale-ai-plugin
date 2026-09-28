@@ -1,0 +1,6 @@
+Revise the following technical text only where needed. Preserve its meaning, commands, paths, identifiers, numbers, quoted errors, negation, requirement strength, prerequisites, and step order. Keep already-correct prose unchanged. Return only the revised document, without commentary or an enclosing code fence.
+
+We must save `/srv/data` before restarting.
+
+1. Run `backup --verify`.
+2. Run `restart --grace 30`.

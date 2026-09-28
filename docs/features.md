@@ -38,3 +38,12 @@ The Google rules automate part of an editorial guide. They don't certify
 Simplified Technical English, format Google Docs, or prove that a document is
 accurate. Use a full audit for existing prose debt and a human review for
 meaning, audience, and technical correctness.
+
+## Writing evaluation
+
+A source checkout includes a labeled corpus and an offline validator for paired
+writing trials. The corpus checks selected rule counts and source lines. The
+validator rejects incomplete pairs, changed literals, and stale reviews without
+calling a model. See the [evaluation guide](evaluation.html) for the full schema,
+examples, and review procedure. Editorial effectiveness remains unverified
+until actual paired trials establish it.

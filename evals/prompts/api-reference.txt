@@ -1,0 +1,5 @@
+Revise the following technical text only where needed. Preserve its meaning, commands, paths, identifiers, numbers, quoted errors, negation, requirement strength, prerequisites, and step order. Keep already-correct prose unchanged. Return only the revised document, without commentary or an enclosing code fence.
+
+Send a type, e.g. text, i.e. a string.
+
+`GET /v1/items?limit=10` accepts the literal `e.g.`.

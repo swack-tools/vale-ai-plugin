@@ -1,0 +1,70 @@
+[
+  {
+    "case_id": "installation",
+    "category": "installation",
+    "format": "md",
+    "input_file": "tests/fixtures/prose/installation-positive.md",
+    "prompt_file": "evals/prompts/installation.txt",
+    "protected_literals": [
+      "tool install --version 2.0",
+      "printf 'We will retry, e.g. later.'"
+    ]
+  },
+  {
+    "case_id": "troubleshooting",
+    "category": "troubleshooting",
+    "format": "md",
+    "input_file": "tests/fixtures/prose/troubleshooting-positive.md",
+    "prompt_file": "evals/prompts/troubleshooting.txt",
+    "protected_literals": [
+      "E_AUTH",
+      "Do not retry"
+    ]
+  },
+  {
+    "case_id": "runbooks",
+    "category": "runbooks",
+    "format": "md",
+    "input_file": "tests/fixtures/prose/runbooks-positive.md",
+    "prompt_file": "evals/prompts/runbooks.txt",
+    "protected_literals": [
+      "must",
+      "/srv/data",
+      "backup --verify",
+      "restart --grace 30"
+    ]
+  },
+  {
+    "case_id": "api-reference",
+    "category": "api-reference",
+    "format": "md",
+    "input_file": "tests/fixtures/prose/api-reference-positive.md",
+    "prompt_file": "evals/prompts/api-reference.txt",
+    "protected_literals": [
+      "GET /v1/items?limit=10",
+      "`e.g.`"
+    ]
+  },
+  {
+    "case_id": "source-comments",
+    "category": "source-comments",
+    "format": "py",
+    "input_file": "tests/fixtures/prose/source-comments-positive.py",
+    "prompt_file": "evals/prompts/source-comments.txt",
+    "protected_literals": [
+      "None",
+      "item_id",
+      "ERROR = \"We will retry, e.g. later.\""
+    ]
+  },
+  {
+    "case_id": "correct-prose",
+    "category": "correct-prose",
+    "format": "md",
+    "input_file": "tests/fixtures/prose/correct-prose-negative.md",
+    "prompt_file": "evals/prompts/correct-prose.txt",
+    "protected_literals": [
+      "`We will retry, e.g. later.`"
+    ]
+  }
+]

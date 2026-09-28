@@ -14,7 +14,8 @@ plugins/vale/          Shared Claude Code and Codex plugin
 .agents/plugins/      Codex marketplace catalog
 .claude-plugin/       Claude Code marketplace catalog
 scripts/              Installation, verification, and site build tools
-tests/                Runtime and installation tests
+tests/                Runtime, installation, and labeled prose tests
+evals/                Synthetic prompts and paired-trial instructions
 docs/                 Documentation source and static assets
 .github/workflows/    Checks and GitHub Pages deployment
 ```
@@ -192,3 +193,16 @@ Native fixture cleanup retries only transient nonempty-directory errors, for
 at most three seconds of retry delay. Other cleanup failures remain visible.
 All matrix jobs and the documentation build must pass before a push to `main`
 can deploy Pages. Pull requests never deploy.
+
+## Evaluate writing changes
+
+The default suite also checks twelve labeled prose fixtures with real Vale and
+validates synthetic paired-trial records without model access. It tests changed
+commands, incomplete reviews, mismatched models, and altered evidence. These
+checks separate integration reliability from editorial quality.
+
+Use the [writing evaluation guide](evaluation.html) to prepare six baseline/skill
+pairs, record isolated runs, and review technical meaning. The offline validator
+checks evidence completeness and protected literals. It doesn't judge writing
+quality or call a model. The real-model pilot remains unrun, so editorial
+effectiveness remains an open evaluation question.

@@ -16,7 +16,7 @@ def main():
     parser.add_argument('files', nargs='*', type=Path, help='Optional specific documentation files to check.')
     args = parser.parse_args()
     paths = [p.resolve() for p in args.files] if args.files else [
-        ROOT / 'README.md', *sorted((ROOT / 'docs').rglob('*.md')),
+        ROOT / 'README.md', ROOT / 'evals/README.md', *sorted((ROOT / 'docs').rglob('*.md')),
         *sorted((PACKAGE / 'skills').rglob('*.md')), *sorted((PACKAGE / 'prompts').rglob('*.md')),
     ]
     result = empty_result(ROOT, [str(p) for p in paths])
