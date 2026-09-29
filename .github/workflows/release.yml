@@ -26,8 +26,7 @@ jobs:
           git merge-base --is-ancestor "$GITHUB_SHA" origin/main
       - name: Require tag to match plugin version
         run: |
-          VERSION="$(python3 -c 'import json; print(json.load(open("plugins/vale/.claude-plugin/plugin.json"))["version"])')"
-          test "$GITHUB_REF_NAME" = "v$VERSION"
+          python3 scripts/validate_release_version.py "$GITHUB_REF_NAME"
       - name: Build Claude and Codex archives
         run: python3 scripts/package_release.py "$RUNNER_TEMP/release"
       - name: Publish release

@@ -13,7 +13,7 @@ EXCLUDED_NAMES = {".DS_Store", "Thumbs.db"}
 
 
 def archive(target: Path, client: str) -> None:
-    files = []
+    files = [(ROOT / "LICENSE", "LICENSE")]
     for source in PLUGIN.rglob("*"):
         if not source.is_file() or source.is_symlink():
             continue
