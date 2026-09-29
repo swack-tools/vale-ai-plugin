@@ -140,6 +140,7 @@ reproducible inputs, review criteria, and evidence limits.
 ## Diagnostics
 
 Run `python3 plugins/vale/scripts/prose_lint.py --doctor` to inspect the engine,
-configuration, and optional markup parsers. Add `--format json` to a file check
-for structured findings and incomplete-check diagnostics. Refer to the
+configuration, and optional markup parsers. Doctor has a 20-second total
+budget. Add `--format json` to a file check for structured findings and
+incomplete-check diagnostics. Refer to the
 [command documentation](https://vale.swacktech.com/usage.html) for examples.
