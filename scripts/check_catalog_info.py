@@ -170,8 +170,11 @@ def _validate_source(root: Path, source: dict, errors: list[str]) -> bool:
         errors.append(f"unsafe source path: {rel}")
         return False
     path = (root / Path(*posix.parts)).resolve()
-    if root not in path.parents or not path.is_file():
-        if source.get("required", True):
+    if root not in path.parents:
+        errors.append(f"source path missing or outside repository: {rel}")
+        return False
+    if not path.is_file():
+        if required:
             errors.append(f"source path missing or outside repository: {rel}")
         return False
 
