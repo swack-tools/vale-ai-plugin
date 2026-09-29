@@ -136,6 +136,9 @@ text, bounded policy fingerprints, and Git blob reads. `vale_runner.py` provides
 the shared file and in-memory document adapter. `lint_result.py` retains raw
 findings and selects actionable indexes for feedback. `prose_lint.py` coordinates
 command-line scopes and lifecycle state. These modules share one monotonic deadline.
+Subprocess lifecycle tests cover transient `EPERM` during child exit and a denied
+signal to a live child. The former preserves the original capture or timeout
+failure. The latter remains an explicit cleanup error and reaps the owned child.
 
 When updating bundled rules or configuration, review the locality assumptions
 before updating the trusted rule hashes and complete policy digest in

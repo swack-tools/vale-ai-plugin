@@ -131,8 +131,13 @@ and Stop events still scan metadata to detect shell and unknown-tool edits.
 
 Each hook has a 50-second work budget covering discovery, lock waits, and
 checks. Individual engine calls have a maximum of 20 seconds within that
-budget. The runtime limits subprocess output to 8 MiB. Timeout cleanup terminates the
-process group, including parser children. Report finalization has a separate
+budget. The runtime limits subprocess output to 8 MiB. Timeout cleanup terminates
+the process group, including parser children. If macOS briefly denies a signal
+while an owned child exits, cleanup waits 100 ms and retries the group signal. A
+persistent denial kills and reaps the owned direct child, then returns an
+incomplete result because descendants may still run. This
+exceptional cleanup path can add up to 1.1 seconds beyond the work budget.
+Report finalization has a separate
 5-second subprocess allowance before the client's 60-second outer timeout.
 Uninterruptible filesystem operations remain subject to operating-system
 behavior. Filesystem operations can exceed the work budget.
