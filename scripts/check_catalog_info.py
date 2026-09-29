@@ -20,22 +20,72 @@ SOURCE_MODES = {"markdown": {"lead", "section"}, "html": {"section"}}
 
 
 def _native(root: Path, plugin_id: str) -> tuple[set[str], set[str]]:
+    root = root.resolve()
     package = root / "plugins" / plugin_id
     capabilities: set[str] = set()
     hook_targets: set[str] = set()
     if not package.is_dir():
         return capabilities, hook_targets
-    for skill in package.rglob("SKILL.md"):
-        text = skill.read_text(encoding="utf-8")
-        match = re.search(r"(?ms)^---\s*\n(.*?)\n---", text)
-        name = re.search(r"(?m)^name:\s*['\"]?([^'\"\n]+)", match.group(1)) if match else None
-        if name:
-            capabilities.add(f"skill:{name.group(1).strip()}")
-    for command in package.rglob("commands/*.md"):
-        capabilities.add(f"command:{command.stem}")
-    for manifest in package.rglob("*.json"):
-        if manifest.name.lower() not in {"hooks.json", "mcp.json", ".mcp.json"}:
+
+    manifests = []
+    for host in ("claude", "codex"):
+        manifest = package / f".{host}-plugin" / "plugin.json"
+        try:
+            data = json.loads(manifest.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
             continue
+        if isinstance(data, dict):
+            manifests.append(data)
+
+    def component_paths(field: str, default: Path) -> set[Path]:
+        declared: set[Path] = set()
+        values = [manifest.get(field) for manifest in manifests]
+        for value in values:
+            for item in value if isinstance(value, list) else [value]:
+                if not isinstance(item, str):
+                    continue
+                candidate = (package / item).resolve()
+                if (candidate == package or package in candidate.parents) and candidate.exists():
+                    declared.add(candidate)
+        if default.exists():
+            declared.add(default.resolve())
+        return declared
+
+    skill_roots = component_paths("skills", package / "skills")
+    command_roots = component_paths("commands", package / "commands")
+    hook_roots = component_paths("hooks", package / "hooks" / "hooks.json")
+
+    for skill_root in skill_roots:
+        if skill_root.is_file() and skill_root.name == "SKILL.md":
+            skill_files = [skill_root]
+        elif skill_root.is_dir():
+            skill_files = skill_root.rglob("SKILL.md")
+        else:
+            skill_files = []
+        for skill in skill_files:
+            text = skill.read_text(encoding="utf-8")
+            match = re.search(r"(?ms)^---\s*\n(.*?)\n---", text)
+            name = re.search(r"(?m)^name:\s*['\"]?([^'\"\n]+)", match.group(1)) if match else None
+            if name:
+                capabilities.add(f"skill:{name.group(1).strip()}")
+    for command_root in command_roots:
+        command_files = command_root.rglob("*.md") if command_root.is_dir() else [command_root]
+        for command in command_files:
+            if command.is_file():
+                capabilities.add(f"command:{command.stem}")
+
+    manifests_to_scan = set()
+    for hook_root in hook_roots:
+        if hook_root.is_file():
+            manifests_to_scan.add(hook_root)
+        elif hook_root.is_dir():
+            manifests_to_scan.update(hook_root.rglob("*.json"))
+    # Include standard MCP manifests independently of hook declarations.
+    manifests_to_scan.update(
+        manifest for manifest in package.rglob("*.json")
+        if manifest.name.lower() in {"hooks.json", "mcp.json", ".mcp.json"}
+    )
+    for manifest in manifests_to_scan:
         try:
             data = json.loads(manifest.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
@@ -47,12 +97,20 @@ def _native(root: Path, plugin_id: str) -> tuple[set[str], set[str]]:
                 for i, group in enumerate(groups if isinstance(groups, list) else []):
                     for j, _ in enumerate(group.get("hooks", []) if isinstance(group, dict) else []):
                         hook_targets.add(f"{rel}#/hooks/{event}/{i}/hooks/{j}")
-        servers = data.get("mcpServers", data if manifest.name.lower() == ".mcp.json" else {}) if isinstance(data, dict) else {}
+        servers = (
+            data.get("mcpServers", data if manifest.name.lower() == ".mcp.json" else {})
+            if isinstance(data, dict)
+            else {}
+        )
         if isinstance(servers, dict):
             capabilities.update(f"mcp_server:{name}" for name in servers)
-    for source in (root / "src").rglob("*.rs") if (root / "src").exists() else []:
+
+    for source in package.rglob("*.rs"):
         text = source.read_text(encoding="utf-8", errors="replace")
-        capabilities.update(f"mcp_tool:{name}" for name in re.findall(r'\btool\(\s*"([a-zA-Z0-9_-]+)"', text))
+        capabilities.update(
+            f"mcp_tool:{name}"
+            for name in re.findall(r'\btool\(\s*"([a-zA-Z0-9_-]+)"', text)
+        )
     return capabilities, hook_targets
 
 
@@ -122,14 +180,12 @@ def _validate_source(root: Path, source: dict, errors: list[str]) -> bool:
         if not isinstance(heading_path, list) or not heading_path or any(
             not isinstance(part, str) or not part.strip() for part in heading_path
         ):
-            if required:
-                errors.append(f"Markdown section is missing a valid heading selector: {rel}")
+            errors.append(f"Markdown section is missing a valid heading selector: {rel}")
             return False
         try:
             matches = _heading_matches(path.read_text(encoding="utf-8"), heading_path)
             if matches != 1:
-                if required:
-                    errors.append(f"Markdown heading selector must match exactly once: {rel}")
+                errors.append(f"Markdown heading selector must match exactly once: {rel}")
                 return False
         except (OSError, UnicodeError):
             errors.append(f"cannot resolve Markdown source: {rel}")
@@ -138,14 +194,12 @@ def _validate_source(root: Path, source: dict, errors: list[str]) -> bool:
     if format_name == "html" and mode == "section":
         selector = source.get("selector")
         if not isinstance(selector, str) or not selector.strip():
-            if required:
-                errors.append(f"HTML section is missing a valid CSS selector: {rel}")
+            errors.append(f"HTML section is missing a valid CSS selector: {rel}")
             return False
         try:
             count = len(BeautifulSoup(path.read_text(encoding="utf-8"), "html.parser").select(selector))
             if count != 1:
-                if required:
-                    errors.append(f"HTML selector must match exactly once: {rel}")
+                errors.append(f"HTML selector must match exactly once: {rel}")
                 return False
         except Exception:
             errors.append(f"HTML selector invalid: {rel}")

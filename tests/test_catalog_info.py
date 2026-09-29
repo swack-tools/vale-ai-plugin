@@ -1,4 +1,5 @@
 import json
+import tempfile
 from unittest.mock import patch
 import unittest
 from pathlib import Path
@@ -98,6 +99,22 @@ class CatalogInfoTests(unittest.TestCase):
             source["heading_path"] = ["Catalog section that does not exist"]
         self.assertTrue(any("selector" in error or "heading" in error for error in checker.validate(ROOT, data)))
 
+    def test_optional_existing_source_still_requires_a_valid_selector(self):
+        data = json.loads((ROOT / "catalog-info.json").read_text())
+        source = data["examples"][0]["sources"][0]
+        source["required"] = False
+        source["heading_path"] = ["Heading that does not exist"]
+        errors = checker.validate(ROOT, data)
+        self.assertTrue(any("heading selector must match exactly once" in error for error in errors))
+
+    def test_optional_missing_source_remains_allowed(self):
+        data = json.loads((ROOT / "catalog-info.json").read_text())
+        source = data["examples"][0]["sources"][0]
+        source["required"] = False
+        source["path"] = "docs/not-present.md"
+        source.pop("heading_path")
+        self.assertFalse(any("source path missing" in error for error in checker.validate(ROOT, data)))
+
     def test_invented_capability_is_rejected(self):
         data = json.loads((ROOT / "catalog-info.json").read_text())
         data["examples"][0]["capability_refs"] = ["mcp_tool:invented_tool"]
@@ -151,6 +168,41 @@ class CatalogInfoTests(unittest.TestCase):
         with patch.object(checker, "_native", return_value=(capabilities, hook_targets)):
             errors = checker.validate(ROOT, data)
         self.assertTrue(any("native MCP server is missing from metadata: new-server" in error for error in errors))
+
+    def test_native_inventory_follows_declared_component_paths_and_package_scope(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            package = root / "plugins" / "vale"
+            (package / ".claude-plugin").mkdir(parents=True)
+            (package / ".codex-plugin").mkdir()
+            (package / "custom-skills" / "review-prose").mkdir(parents=True)
+            (package / "operations").mkdir()
+            (package / "runtime").mkdir()
+            (package / "src").mkdir()
+            (root / "src").mkdir()
+            (package / ".claude-plugin" / "plugin.json").write_text(json.dumps({
+                "skills": "custom-skills",
+                "commands": "operations",
+                "hooks": "runtime/lifecycle.json",
+            }))
+            (package / ".codex-plugin" / "plugin.json").write_text("{}")
+            (package / "custom-skills" / "review-prose" / "SKILL.md").write_text(
+                "---\nname: review-prose\ndescription: Review prose.\n---\n"
+            )
+            (package / "operations" / "audit.md").write_text("# Audit\n")
+            (package / "runtime" / "lifecycle.json").write_text(json.dumps({
+                "hooks": {"AfterEdit": [{"hooks": [{}]}]}
+            }))
+            (package / "src" / "server.rs").write_text('tool("package_tool", "description");')
+            (root / "src" / "unrelated.rs").write_text('tool("unrelated_tool", "description");')
+
+            capabilities, hook_targets = checker._native(root, "vale")
+
+        self.assertIn("skill:review-prose", capabilities)
+        self.assertIn("command:audit", capabilities)
+        self.assertIn("mcp_tool:package_tool", capabilities)
+        self.assertNotIn("mcp_tool:unrelated_tool", capabilities)
+        self.assertIn("plugins/vale/runtime/lifecycle.json#/hooks/AfterEdit/0/hooks/0", hook_targets)
 
 
 if __name__ == "__main__":
