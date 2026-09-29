@@ -58,7 +58,8 @@ installation guide for that compatibility path.
 
 The checker leaves files unchanged. The agent applies requested corrections.
 A project `.vale.ini` overrides the bundled Google rules. The Stop hook requests
-one correction pass and then reports remaining findings. Vale checks an
+one correction pass. Final warning visibility depends on the client. See the
+[delivery limits](https://vale.swacktech.com/development.html#feedback-delivery). Vale checks an
 automated subset of the Google style guide. It doesn't format Google Docs.
 
 Automatic new-findings feedback is opt-in through project policy or the installer’s
@@ -101,13 +102,17 @@ Vale. Use one installation method per workspace to avoid duplicate hooks.
 ## Development
 
 ```sh
+python3 -m pip install -r requirements-dev.txt
+python3 scripts/validate_plugin.py
 python3 -m unittest discover -s tests -v
 python3 scripts/codex_smoke.py --plugin
 python3 scripts/claude_smoke.py
 ```
 
 CI tests Linux and macOS on Python 3.11 and 3.14, requires both optional markup
-parsers, and runs both clients with both feedback scopes. The smoke tests use
+parsers, and validates both marketplace packages. Eight native jobs cover both
+operating systems, four installation paths, and both feedback scopes. They check
+fresh installs, local plugin updates, and unresolved Stop behavior. The smoke tests use
 the real clients with local model fixtures and temporary configuration. The fixtures need no model account or API key. See the
 [development guide](https://vale.swacktech.com/development.html) for details.
 

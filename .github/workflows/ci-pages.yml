@@ -35,6 +35,10 @@ jobs:
           gem install asciidoctor --version 2.0.26 --no-document --install-dir "$RUNNER_TEMP/gems" --bindir "$RUNNER_TEMP/gem-bin"
           echo "GEM_HOME=$RUNNER_TEMP/gems" >> "$GITHUB_ENV"
           echo "$RUNNER_TEMP/gem-bin" >> "$GITHUB_PATH"
+      - name: Validate distributable package
+        run: |
+          python -m pip install -r requirements-dev.txt
+          python scripts/validate_plugin.py
       - name: Test hooks and installers
         shell: bash
         env:
@@ -50,19 +54,18 @@ jobs:
       - name: Check documentation style
         run: python scripts/check_docs.py
   native:
-    name: Native ${{ matrix.host }} (${{ matrix.scope }})
-    runs-on: ubuntu-latest
+    name: Native ${{ matrix.case.name }} (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
-        host: [codex, claude]
-        scope: [changed-files, new-findings]
-        include:
-          - scope: changed-files
-            skill: check-prose
-          - scope: new-findings
-            skill: procedural-prose
+        os: [ubuntu-latest, macos-latest]
+        case:
+          - {name: codex-manual, host: codex, args: '', scope: changed-files, skill: check-prose}
+          - {name: codex-plugin, host: codex, args: '--plugin', scope: new-findings, skill: procedural-prose}
+          - {name: claude-user, host: claude, args: '--scope user', scope: changed-files, skill: check-prose}
+          - {name: claude-project, host: claude, args: '--scope project', scope: new-findings, skill: procedural-prose}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -77,27 +80,52 @@ jobs:
         run: |
           python scripts/install_vale_ci.py "$RUNNER_TEMP/vale-bin"
           echo "$RUNNER_TEMP/vale-bin" >> "$GITHUB_PATH"
-      - name: Install pinned Codex client
-        if: matrix.host == 'codex'
-        run: npm install --global @openai/codex@0.158.0
-      - name: Install pinned Claude client
-        if: matrix.host == 'claude'
-        run: npm install --global @anthropic-ai/claude-code@2.1.277
-      - name: Exercise Codex marketplace and hooks
-        if: matrix.host == 'codex'
-        run: python scripts/codex_smoke.py --plugin --feedback-scope "${{ matrix.scope }}" --skill "${{ matrix.skill }}"
-      - name: Exercise Claude marketplace and hooks
-        if: matrix.host == 'claude'
-        run: python scripts/claude_smoke.py --scope project --feedback-scope "${{ matrix.scope }}" --skill "${{ matrix.skill }}"
+      - name: Select pinned client archive
+        env:
+          CLIENT: ${{ matrix.case.host }}
+        run: |
+          if [ "$CLIENT" = codex ]; then
+            echo 'CLIENT_PACKAGE=@openai/codex@0.158.0' >> "$GITHUB_ENV"
+            echo 'CLIENT_INTEGRITY=sha512-GBhcKpQmVLsCtEP5mUf6WFye6QQgTKotwsXrYPM0GFmEsoOSahik6hkf2FHabX9kZBl0Y0/PQowLu7uYMKT8dg==' >> "$GITHUB_ENV"
+          else
+            echo 'CLIENT_PACKAGE=@anthropic-ai/claude-code@2.1.277' >> "$GITHUB_ENV"
+            echo 'CLIENT_INTEGRITY=sha512-JedQvDxaHIWr303Ymlqlz43j3LqRaUe7rNtDKjEDQaHt8MkKPpCR+jKI6K0TKU5gquTqodgYLfTNM3qfGkTbpQ==' >> "$GITHUB_ENV"
+          fi
+      - name: Verify and install client archive
+        shell: bash
+        run: |
+          archive_dir=$(mktemp -d)
+          npm pack "$CLIENT_PACKAGE" --ignore-scripts --pack-destination "$archive_dir" --json > "$archive_dir/pack.json"
+          package_file=$(python - "$archive_dir" <<'PYCODE'
+          import base64, hashlib, json, os, pathlib, sys
+          directory = pathlib.Path(sys.argv[1])
+          name = json.loads((directory / 'pack.json').read_text())[0]['filename']
+          archive = directory / name
+          assert archive.parent == directory and archive.is_file()
+          observed = 'sha512-' + base64.b64encode(hashlib.sha512(archive.read_bytes()).digest()).decode()
+          assert observed == os.environ['CLIENT_INTEGRITY'], 'Client archive integrity mismatch'
+          print(archive)
+          PYCODE
+          )
+          npm install --global "$package_file"
+      - name: Validate native Claude manifests
+        if: matrix.case.host == 'claude'
+        run: |
+          claude plugin validate plugins/vale --strict
+          claude plugin validate .claude-plugin/marketplace.json --strict
+      - name: Exercise fresh installation and correction
+        run: python scripts/${{ matrix.case.host }}_smoke.py ${{ matrix.case.args }} --feedback-scope "${{ matrix.case.scope }}" --skill "${{ matrix.case.skill }}" --output-dir .research/native/fresh
+      - name: Exercise unresolved active Stop
+        run: python scripts/${{ matrix.case.host }}_smoke.py ${{ matrix.case.args }} --feedback-scope "${{ matrix.case.scope }}" --skill "${{ matrix.case.skill }}" --unresolved --output-dir .research/native/unresolved
+      - name: Exercise local plugin update discovery
+        if: matrix.case.name != 'codex-manual'
+        run: python scripts/${{ matrix.case.host }}_smoke.py ${{ matrix.case.args }} --feedback-scope "${{ matrix.case.scope }}" --skill "${{ matrix.case.skill }}" --upgrade --output-dir .research/native/upgrade
       - name: Retain native fixture evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: native-${{ matrix.host }}-${{ matrix.scope }}
-          path: |
-            .research/*-smoke.jsonl
-            .research/*-smoke.stderr
-            .research/*-smoke-requests.json
+          name: native-${{ matrix.case.name }}-${{ matrix.os }}
+          path: .research/native/
           retention-days: 7
 
   build:

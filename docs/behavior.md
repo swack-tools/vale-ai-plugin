@@ -110,7 +110,10 @@ Configuration and parser failures produce an incomplete-check diagnostic.
 They don't ask the agent to rewrite prose. At Stop, a diagnostic can request
 one continuation to resolve or report the problem. The active retry never
 blocks again. The final warning uses `systemMessage`. Clients control whether
-that warning is visible to the user, the model, or both.
+that warning is visible to the user, the model, or both. In the tested headless
+clients, neither model receives it. Claude exposes it in stdout, while Codex
+JSON stdout omits it. Use an explicit file check or full audit for a final
+report. See the [observed delivery table](development.html#feedback-delivery).
 
 Hook feedback contains complete findings and a count of shown and omitted
 findings within a 16,000-character budget. When a report is too large, the hook
