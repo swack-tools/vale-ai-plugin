@@ -70,7 +70,7 @@ class DoctorTests(unittest.TestCase):
         self.assertEqual(result['coverage']['verification'], 'configured_invocation')
         self.assertIn('config_path', result['config'])
 
-    def run_with_deadline(self, *, fake_git=None, fake_vale=None):
+    def run_with_deadline(self, *, fake_git=None, fake_vale=None, seconds=0.08):
         scripts = self.root / 'bin'
         scripts.mkdir(exist_ok=True)
         if fake_git:
@@ -87,7 +87,7 @@ class DoctorTests(unittest.TestCase):
         self.addCleanup(lambda: sys.path.remove(str(HOOK.parent)))
         prose_lint = importlib.import_module('prose_lint')
         from deadline import Deadline
-        with patch.object(prose_lint, 'Deadline', lambda _seconds: Deadline(0.08)), \
+        with patch.object(prose_lint, 'Deadline', lambda _seconds: Deadline(seconds)), \
              patch.dict(os.environ, {'PATH': self.env['PATH']}), \
              patch.object(sys, 'argv', [str(HOOK), '--doctor', '--format', 'json']), \
              patch('pathlib.Path.cwd', return_value=self.root), \
@@ -127,3 +127,25 @@ class DoctorTests(unittest.TestCase):
         self.assertEqual(code, 2)
         self.assertEqual(result['overall_status'], 'incomplete')
         self.assertTrue(result['errors'])
+
+    def test_doctor_probe_output_is_bounded(self):
+        code, result = self.run_with_deadline(
+            fake_vale='import sys\n'
+                      "if '--version' in sys.argv:\n"
+                      "    print('x' * 2_000_000)\n", seconds=2)
+        self.assertEqual(code, 2)
+        self.assertEqual(result['overall_status'], 'incomplete')
+        self.assertTrue(any('output exceeded' in error for error in result['errors']))
+
+    def test_doctor_timeout_stops_probe_descendants(self):
+        marker = self.root / 'late-child-write'
+        child = "import time; time.sleep(.3); open(" + repr(str(marker)) + ", 'w').write('late')"
+        body = ('import subprocess, sys, time\n'
+                "if '--version' in sys.argv:\n"
+                f'    subprocess.Popen([sys.executable, "-c", {child!r}])\n'
+                '    time.sleep(2)\n')
+        code, result = self.run_with_deadline(fake_vale=body)
+        self.assertEqual(code, 2)
+        self.assertEqual(result['overall_status'], 'incomplete')
+        time.sleep(.4)
+        self.assertFalse(marker.exists())
