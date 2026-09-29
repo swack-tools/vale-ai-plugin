@@ -5,6 +5,9 @@ import signal
 import subprocess
 import time
 
+PROCESS_EXIT_GRACE = 0.1
+PROCESS_REAP_TIMEOUT = 1.0
+
 
 class DeadlineExceeded(TimeoutError):
     pass
@@ -92,19 +95,45 @@ def run_process(args, *, cwd=None, input=None, deadline=None, timeout=20, max_ou
         return subprocess.CompletedProcess(args, proc.returncode, stdout, stderr)
     finally:
         # Even an exited parent can leave a parser descendant holding a pipe.
+        cleanup_error = None
         try:
             try:
                 os.killpg(proc.pid, signal.SIGKILL)
             except ProcessLookupError:
                 # The process group has already exited; no descendants need killing.
                 pass
-            except PermissionError:
-                # macOS can return EPERM for an exited group. Only accept it
-                # after reaping our child; a running child's failure stays visible.
-                if proc.poll() is None:
-                    raise
+            except PermissionError as signal_error:
+                # macOS can report EPERM while an owned child is completing exit.
+                # Reap briefly, then retry the group signal to catch descendants.
+                try:
+                    proc.wait(timeout=PROCESS_EXIT_GRACE)
+                except subprocess.TimeoutExpired:
+                    # A live child means the group signal really failed. Kill
+                    # the owned direct child so it cannot leak, but report the
+                    # group failure because descendants may still be running.
+                    cleanup_error = signal_error
+                    try:
+                        proc.kill()
+                    except ProcessLookupError:
+                        pass
+                    except OSError as kill_error:
+                        cleanup_error.add_note(f'Could not kill owned child: {kill_error}')
+                else:
+                    try:
+                        os.killpg(proc.pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+                    except PermissionError as retry_error:
+                        cleanup_error = retry_error
         finally:
             for stream in (proc.stdin, proc.stdout, proc.stderr):
                 stream.close()
             selector.close()
-            proc.wait(timeout=1)
+            try:
+                proc.wait(timeout=PROCESS_REAP_TIMEOUT)
+            except subprocess.TimeoutExpired as wait_error:
+                if cleanup_error is None:
+                    cleanup_error = RuntimeError('Could not reap the owned Vale subprocess within one second.')
+                cleanup_error.add_note(str(wait_error))
+            if cleanup_error is not None:
+                raise cleanup_error

@@ -238,10 +238,95 @@ class PerformanceTests(unittest.TestCase):
 
     def test_exited_process_group_permission_error_does_not_mask_result(self):
         module = self.deadline_module()
-        with patch.object(module.os, 'killpg', side_effect=PermissionError('group already exited')):
+        with patch.object(module.os, 'killpg', side_effect=[
+                PermissionError('group is exiting'), ProcessLookupError('group has exited')]):
             result = module.run_process([sys.executable, '-c', 'print("finished")'])
         self.assertEqual(result.returncode, 0)
         self.assertEqual(result.stdout.strip(), 'finished')
+
+    def test_transient_exit_permission_error_preserves_original_failure(self):
+        module = self.deadline_module()
+        real_popen = module.subprocess.Popen
+        processes = []
+
+        def spawn_with_one_stale_poll(*args, **kwargs):
+            proc = real_popen(*args, **kwargs)
+            processes.append(proc)
+            real_poll = proc.poll
+            stale = True
+
+            def poll():
+                nonlocal stale
+                if stale:
+                    stale = False
+                    return None
+                return real_poll()
+
+            proc.poll = poll
+            return proc
+
+        child = 'import sys,time;sys.stdout.write("x"*1000);sys.stdout.flush();time.sleep(.03)'
+        with patch.object(module.subprocess, 'Popen', side_effect=spawn_with_one_stale_poll), \
+             patch.object(module.os, 'killpg', side_effect=[
+                 PermissionError('transient exit race'), ProcessLookupError('group has exited')]):
+            with self.assertRaisesRegex(module.OutputLimitExceeded, 'capture limit'):
+                module.run_process([sys.executable, '-c', child], max_output=64)
+        self.assertEqual(processes[0].returncode, 0)
+
+    def test_transient_exit_permission_error_preserves_deadline_failure(self):
+        module = self.deadline_module()
+        child = 'import time;time.sleep(.03)'
+        with patch.object(module.os, 'killpg', side_effect=[
+                PermissionError('transient exit race'), ProcessLookupError('group has exited')]):
+            with self.assertRaisesRegex(module.DeadlineExceeded, 'deadline exceeded'):
+                module.run_process([sys.executable, '-c', child], deadline=module.Deadline(.005))
+
+    def test_permission_retry_stops_descendant_after_parent_exits(self):
+        module = self.deadline_module()
+        marker = self.root / 'descendant-late-write'
+        descendant = ('import time;from pathlib import Path;time.sleep(.3);'
+                      f'Path({str(marker)!r}).touch()')
+        child = ('import subprocess,sys;subprocess.Popen([sys.executable,"-c",'
+                 + repr(descendant) + ']);sys.stdout.write("x"*1000);sys.stdout.flush()')
+        real_killpg = module.os.killpg
+        attempts = 0
+
+        def transient_denial_then_group_kill(pid, signum):
+            nonlocal attempts
+            attempts += 1
+            if attempts == 1:
+                raise PermissionError('transient exit race')
+            return real_killpg(pid, signum)
+
+        with patch.object(module.os, 'killpg', side_effect=transient_denial_then_group_kill):
+            with self.assertRaisesRegex(module.OutputLimitExceeded, 'capture limit'):
+                module.run_process([sys.executable, '-c', child], max_output=64)
+        time.sleep(.35)
+        self.assertFalse(marker.exists())
+        self.assertEqual(attempts, 2)
+
+    def test_live_child_permission_error_stays_visible_and_child_is_reaped(self):
+        module = self.deadline_module()
+        real_popen = module.subprocess.Popen
+        processes = []
+
+        def capture_process(*args, **kwargs):
+            proc = real_popen(*args, **kwargs)
+            processes.append(proc)
+            return proc
+
+        child = 'import sys,time;sys.stdout.write("x"*1000);sys.stdout.flush();time.sleep(10)'
+        try:
+            with patch.object(module.subprocess, 'Popen', side_effect=capture_process), \
+                 patch.object(module.os, 'killpg', side_effect=PermissionError('group signal denied')):
+                with self.assertRaisesRegex(PermissionError, 'group signal denied'):
+                    module.run_process([sys.executable, '-c', child], max_output=64)
+        finally:
+            for proc in processes:
+                if proc.poll() is None:
+                    proc.kill()
+                    proc.wait(timeout=1)
+        self.assertIsNotNone(processes[0].returncode)
 
     def test_output_limit_is_enforced(self):
         module = self.deadline_module()
