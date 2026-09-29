@@ -14,8 +14,9 @@ from markdown_it import MarkdownIt
 
 SCHEMA_SHA256 = "d115d44f2d32c653f97c08e889587a04353c871db55821d11e126d2e14707e13"
 SCHEMA_MARKETPLACE_COMMIT = "437c642bdac19d744dbb26b79bc2e673bebf0691"
-SCHEMA_MARKETPLACE_COMMIT = "437c642bdac19d744dbb26b79bc2e673bebf0691"
 SCHEMA_PATH = Path(".github/schemas/upstream-info.schema.json")
+CANONICAL_PLUGIN_ID = "vale"
+SOURCE_MODES = {"markdown": {"lead", "section"}, "html": {"section"}}
 
 
 def _native(root: Path, plugin_id: str) -> tuple[set[str], set[str]]:
@@ -74,17 +75,78 @@ def _heading_matches(text: str, path: list[str]) -> int:
 
 def _source_entries(data):
     found = []
-    def walk(value):
+    def walk(value, *, in_target=False):
         if isinstance(value, dict):
-            if isinstance(value.get("path"), str):
+            if not in_target and isinstance(value.get("path"), str):
                 found.append(value)
-            for item in value.values():
-                walk(item)
+            for key, item in value.items():
+                walk(item, in_target=in_target or key == "target")
         elif isinstance(value, list):
             for item in value:
-                walk(item)
+                walk(item, in_target=in_target)
     walk(data)
     return found
+
+
+def _validate_source(root: Path, source: dict, errors: list[str]) -> bool:
+    rel = source.get("path")
+    if not isinstance(rel, str):
+        errors.append("catalog source path must be a string")
+        return False
+    required = source.get("required", True)
+    format_name = source.get("format")
+    mode = source.get("mode")
+    if not isinstance(format_name, str) or format_name not in SOURCE_MODES:
+        errors.append(f"unsupported source format {format_name!r}: {rel}")
+        return False
+    if not isinstance(mode, str) or mode not in SOURCE_MODES[format_name]:
+        errors.append(f"unsupported source mode {mode!r} for {format_name}: {rel}")
+        return False
+
+    posix = PurePosixPath(rel)
+    if posix.is_absolute() or ".." in posix.parts or "\\" in rel:
+        errors.append(f"unsafe source path: {rel}")
+        return False
+    path = (root / Path(*posix.parts)).resolve()
+    if root not in path.parents or not path.is_file():
+        if source.get("required", True):
+            errors.append(f"source path missing or outside repository: {rel}")
+        return False
+
+    if format_name == "markdown" and mode == "section":
+        heading_path = source.get("heading_path")
+        if not isinstance(heading_path, list) or not heading_path or any(
+            not isinstance(part, str) or not part.strip() for part in heading_path
+        ):
+            if required:
+                errors.append(f"Markdown section is missing a valid heading selector: {rel}")
+            return False
+        try:
+            matches = _heading_matches(path.read_text(encoding="utf-8"), heading_path)
+            if matches != 1:
+                if required:
+                    errors.append(f"Markdown heading selector must match exactly once: {rel}")
+                return False
+        except (OSError, UnicodeError):
+            errors.append(f"cannot resolve Markdown source: {rel}")
+            return False
+
+    if format_name == "html" and mode == "section":
+        selector = source.get("selector")
+        if not isinstance(selector, str) or not selector.strip():
+            if required:
+                errors.append(f"HTML section is missing a valid CSS selector: {rel}")
+            return False
+        try:
+            count = len(BeautifulSoup(path.read_text(encoding="utf-8"), "html.parser").select(selector))
+            if count != 1:
+                if required:
+                    errors.append(f"HTML selector must match exactly once: {rel}")
+                return False
+        except Exception:
+            errors.append(f"HTML selector invalid: {rel}")
+            return False
+    return True
 
 
 def validate(root: Path, data: dict | None = None) -> list[str]:
@@ -95,76 +157,99 @@ def validate(root: Path, data: dict | None = None) -> list[str]:
         schema_bytes = schema_file.read_bytes()
         schema = json.loads(schema_bytes)
         if hashlib.sha256(schema_bytes).hexdigest() != SCHEMA_SHA256:
-            errors.append("pinned schema digest mismatch; refresh only to an approved marketplace schema")
+            errors.append(
+                f"pinned schema digest mismatch for marketplace commit {SCHEMA_MARKETPLACE_COMMIT}; "
+                "refresh only to an approved marketplace schema"
+            )
         if data is None:
             data = json.loads((root / "catalog-info.json").read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return errors + ["catalog metadata or pinned schema is missing or invalid JSON"]
     for issue in Draft202012Validator(schema).iter_errors(data):
         errors.append("schema violation at " + "/".join(map(str, issue.absolute_path)))
+    if errors:
+        return errors
     if not isinstance(data, dict) or not isinstance(data.get("pluginId"), str):
         return errors
-    capabilities, hook_targets = _native(root, data["pluginId"])
-    for source in _source_entries(data):
-        rel = source["path"]
-        posix = PurePosixPath(rel)
-        if posix.is_absolute() or ".." in posix.parts or "\\" in rel:
-            errors.append(f"unsafe source path: {rel}")
+    if data["pluginId"] != CANONICAL_PLUGIN_ID:
+        errors.append(f"pluginId must identify the canonical package {CANONICAL_PLUGIN_ID!r}")
+        return errors
+    if not (root / "plugins" / CANONICAL_PLUGIN_ID).is_dir():
+        errors.append(f"canonical package directory is missing: plugins/{CANONICAL_PLUGIN_ID}")
+        return errors
+
+    capabilities, hook_targets = _native(root, CANONICAL_PLUGIN_ID)
+    valid_sources = {
+        id(source)
+        for source in _source_entries(data)
+        if _validate_source(root, source, errors)
+    }
+    examples = data.get("examples", [])
+    if not isinstance(examples, list):
+        examples = []
+    for example in examples:
+        if not isinstance(example, dict):
             continue
-        path = (root / Path(*posix.parts)).resolve()
-        if root not in path.parents or not path.is_file():
-            if source.get("required", True):
-                errors.append(f"source path missing or outside repository: {rel}")
+        refs = example.get("capability_refs", [])
+        if not isinstance(refs, list):
             continue
-        required = source.get("required", True)
-        if required and source.get("format") == "markdown" and source.get("mode") == "section" and not source.get("heading_path"):
-            errors.append(f"Markdown section is missing its heading selector: {rel}")
-        if required and source.get("format") == "html" and source.get("mode") == "section" and not source.get("selector"):
-            errors.append(f"HTML section is missing its CSS selector: {rel}")
-        if source.get("format") == "markdown" and source.get("heading_path"):
-            try:
-                matches = _heading_matches(path.read_text(encoding="utf-8"), source["heading_path"])
-                if required and matches != 1:
-                    errors.append(f"Markdown heading selector must match exactly once: {rel}")
-            except (OSError, UnicodeError):
-                errors.append(f"cannot resolve Markdown source: {rel}")
-        if source.get("format") == "html" and source.get("selector"):
-            try:
-                if len(BeautifulSoup(path.read_text(encoding="utf-8"), "html.parser").select(source["selector"])) != 1 and required:
-                    errors.append(f"HTML selector must match exactly once: {rel}")
-            except Exception:
-                errors.append(f"HTML selector invalid: {rel}")
-    for example in data.get("examples", []):
-        for ref in example.get("capability_refs", []):
+        for ref in refs:
             if ref not in capabilities:
                 errors.append(f"example references unknown native capability: {ref}")
-    cited = {ref for example in data.get("examples", []) for ref in example.get("capability_refs", [])}
+    cited = {
+        ref
+        for example in examples
+        if isinstance(example, dict) and isinstance(example.get("capability_refs", []), list)
+        for ref in example.get("capability_refs", [])
+    }
     for cap in capabilities:
         if cap.startswith("hook:"):
             continue
         if cap not in cited:
             errors.append(f"native capability missing from examples: {cap}")
-    for server in data.get("mcpServers", {}):
-        if f"mcp_server:{server}" not in capabilities:
-            errors.append(f"metadata declares unknown MCP server: {server}")
+    mcp_servers = data.get("mcpServers", {})
+    if not isinstance(mcp_servers, dict):
+        mcp_servers = {}
+    native_servers = {cap.removeprefix("mcp_server:") for cap in capabilities if cap.startswith("mcp_server:")}
+    declared_servers = set(mcp_servers)
+    for server in sorted(native_servers - declared_servers):
+        errors.append(f"native MCP server is missing from metadata: {server}")
+    for server in sorted(declared_servers - native_servers):
+        errors.append(f"metadata declares unknown MCP server: {server}")
     hooks = data.get("hooks", {})
     declared = set()
     if isinstance(hooks, list):
         for item in hooks:
-            declared.add(f"{item.get('target', {}).get('path', '')}#{item.get('target', {}).get('pointer', item.get('target', {}).get('jsonPointer', ''))}")
+            if not isinstance(item, dict):
+                continue
+            target = item.get("target", {})
+            if not isinstance(target, dict):
+                continue
+            declared.add(f"{target.get('path', '')}#{target.get('pointer', target.get('jsonPointer', ''))}")
     elif isinstance(hooks, dict):
         for item in hooks.values():
             if isinstance(item, list):
                 for note in item:
+                    if not isinstance(note, dict):
+                        continue
                     target = note.get("target", {})
+                    if not isinstance(target, dict):
+                        continue
                     declared.add(f"{target.get('path', '')}#{target.get('pointer', target.get('jsonPointer', ''))}")
     for _target in declared - hook_targets:
         errors.append("metadata declares unknown native hook target")
     for _target in hook_targets - declared:
         errors.append("native hook is missing a catalog note")
-    for platform in data.get("platforms", {}).values():
-        if platform.get("status") in {"documented", "unsupported"} and not platform.get("sources"):
-            errors.append("documented platform claim requires source evidence")
+    platforms = data.get("platforms", {})
+    if isinstance(platforms, dict):
+        for name, platform in platforms.items():
+            if not isinstance(platform, dict) or platform.get("status") not in {"documented", "unsupported"}:
+                continue
+            sources = platform.get("sources", [])
+            if not isinstance(sources, list) or not any(
+                isinstance(source, dict) and id(source) in valid_sources for source in sources
+            ):
+                errors.append(f"platform {name!r} claim requires at least one resolved source")
     return errors
 
 

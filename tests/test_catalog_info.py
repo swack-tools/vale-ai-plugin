@@ -1,4 +1,5 @@
 import json
+from unittest.mock import patch
 import unittest
 from pathlib import Path
 
@@ -15,6 +16,28 @@ class CatalogInfoTests(unittest.TestCase):
         data = json.loads((ROOT / "catalog-info.json").read_text())
         data["manualCount"] = 3
         self.assertTrue(any("schema" in error for error in checker.validate(ROOT, data)))
+
+    def test_catalog_must_identify_the_canonical_package(self):
+        data = json.loads((ROOT / "catalog-info.json").read_text())
+        data["pluginId"] = "typo"
+        data["examples"] = []
+        data["hooks"] = []
+        data["mcpServers"] = {}
+        self.assertTrue(any("canonical package" in error for error in checker.validate(ROOT, data)))
+
+    def test_unknown_source_format_is_rejected(self):
+        data = json.loads((ROOT / "catalog-info.json").read_text())
+        data["overview"]["format"] = "markdwon"
+        self.assertTrue(any("unsupported source format" in error for error in checker.validate(ROOT, data)))
+
+        data["overview"]["required"] = False
+        data["overview"]["path"] = "missing.md"
+        self.assertTrue(any("unsupported source format" in error for error in checker.validate(ROOT, data)))
+
+    def test_unknown_source_mode_is_rejected(self):
+        data = json.loads((ROOT / "catalog-info.json").read_text())
+        data["overview"]["mode"] = "lede"
+        self.assertTrue(any("unsupported source mode" in error for error in checker.validate(ROOT, data)))
 
     def test_missing_selector_is_rejected(self):
         data = json.loads((ROOT / "catalog-info.json").read_text())
@@ -100,6 +123,22 @@ class CatalogInfoTests(unittest.TestCase):
         key = next(iter(data["platforms"]))
         data["platforms"][key]["sources"] = []
         self.assertTrue(any("source" in error for error in checker.validate(ROOT, data)))
+
+    def test_platform_source_must_resolve_even_when_marked_optional(self):
+        data = json.loads((ROOT / "catalog-info.json").read_text())
+        key = next(iter(data["platforms"]))
+        data["platforms"][key]["sources"] = [
+            {"path": "missing.md", "format": "markdown", "mode": "lead", "required": False}
+        ]
+        self.assertTrue(any("at least one resolved source" in error for error in checker.validate(ROOT, data)))
+
+    def test_native_mcp_server_must_be_declared_in_catalog(self):
+        data = json.loads((ROOT / "catalog-info.json").read_text())
+        capabilities, hook_targets = checker._native(ROOT, checker.CANONICAL_PLUGIN_ID)
+        capabilities.add("mcp_server:new-server")
+        with patch.object(checker, "_native", return_value=(capabilities, hook_targets)):
+            errors = checker.validate(ROOT, data)
+        self.assertTrue(any("native MCP server is missing from metadata: new-server" in error for error in errors))
 
 
 if __name__ == "__main__":

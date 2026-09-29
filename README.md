@@ -105,6 +105,7 @@ Vale. Use one installation method per workspace to avoid duplicate hooks.
 
 ```sh
 python3 -m pip install -r requirements-dev.txt
+python3 scripts/check_catalog_info.py
 python3 scripts/validate_plugin.py
 python3 -m unittest discover -s tests -v
 python3 scripts/codex_smoke.py --plugin
