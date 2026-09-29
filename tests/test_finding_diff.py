@@ -87,7 +87,7 @@ class ValeUnicodeCoordinateTests(unittest.TestCase):
             markdown.write_text('\n'.join(markdown_lines) + '\n', encoding='utf-8')
             comments.write_text('\n'.join(comment_lines) + '\n', encoding='utf-8')
             config = Path(__file__).resolve().parents[1] / 'plugins/vale/.vale.ini'
-            result = subprocess.run(['vale', f'--config={config}', '--output=JSON', str(markdown), str(comments)],
+            result = subprocess.run(['vale', '--no-global', f'--config={config}', '--output=JSON', str(markdown), str(comments)],
                                     cwd=root, capture_output=True, text=True, check=False)
             self.assertEqual(result.returncode, 1, result.stderr)
             raw = json.loads(result.stdout)
@@ -129,7 +129,7 @@ class ValeUnicodeCoordinateTests(unittest.TestCase):
                 path = Path(name)
                 path.write_text(duplicate_text, encoding='utf-8')
                 duplicate_run = subprocess.run(
-                    ['vale', f'--config={config}', '--output=JSON', str(path)], cwd=root,
+                    ['vale', '--no-global', f'--config={config}', '--output=JSON', str(path)], cwd=root,
                     capture_output=True, text=True, check=False)
                 self.assertEqual(duplicate_run.returncode, 1, duplicate_run.stderr)
                 decoder = importlib.import_module('vale_runner').decode_alert
@@ -143,7 +143,7 @@ class ValeUnicodeCoordinateTests(unittest.TestCase):
                 shifted_text = '\n'.join(shifted_lines) + '\n'
                 path.write_text(shifted_text, encoding='utf-8')
                 shifted_run = subprocess.run(
-                    ['vale', f'--config={config}', '--output=JSON', str(path)], cwd=root,
+                    ['vale', '--no-global', f'--config={config}', '--output=JSON', str(path)], cwd=root,
                     capture_output=True, text=True, check=False)
                 self.assertEqual(shifted_run.returncode, 1, shifted_run.stderr)
                 shifted_findings = [decoder(alert, name) for alert in json.loads(shifted_run.stdout)[name]]
