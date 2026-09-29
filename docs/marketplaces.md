@@ -14,8 +14,9 @@ You don't need a separate organization marketplace to install Vale.
 
 Both catalogs use the name `vale` and point to `./plugins/vale`. The install
 identifier is `vale@vale`: plugin name, then marketplace name. The package
-contains the checker, pinned Google rules, shared hooks, and two skills. It
-requires no Model Context Protocol server, hosted service, OAuth 2.0 connection, or API key.
+contains the checker, pinned Google rules, shared hooks, and the skills defined
+in `plugins/vale/skills/`. It requires no Model Context Protocol server, hosted
+service, OAuth 2.0 connection, or API key.
 
 These are repository marketplaces. Publishing them doesn't list Vale in a
 client's official curated marketplace.

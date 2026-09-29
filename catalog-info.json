@@ -1,0 +1,320 @@
+{
+  "schemaVersion": 1,
+  "pluginId": "vale",
+  "overview": {
+    "path": "docs/index.md",
+    "format": "markdown",
+    "mode": "lead",
+    "required": true
+  },
+  "examples": [
+    {
+      "id": "skill-check-prose-claude-code",
+      "capability_refs": ["skill:check-prose"],
+      "title": "Review a document in Claude Code",
+      "input_or_trigger": "/vale:check-prose README.md docs/installation.md review only",
+      "platform": "claude-code",
+      "prerequisites": [
+        "Install Vale in Claude Code with plugin and lifecycle-hook support. Provide Python 3.11+ and Vale 3.23+. Native Windows isn't supported."
+      ],
+      "expected_behavior": "Report configured findings with their file, line, rule, and correction. Leave the document unchanged.",
+      "sources": [
+        {
+          "path": "docs/usage.md",
+          "format": "markdown",
+          "mode": "section",
+          "required": true,
+          "heading_path": ["Commands, skills, and examples", "Review without editing"]
+        },
+        {
+          "path": "docs/installation.md",
+          "format": "markdown",
+          "mode": "section",
+          "required": true,
+          "heading_path": ["Installation", "Requirements"]
+        }
+      ],
+      "evidence": "documented"
+    },
+    {
+      "id": "skill-check-prose-codex",
+      "capability_refs": ["skill:check-prose"],
+      "title": "Review a document in Codex",
+      "input_or_trigger": "$vale:check-prose Review README.md and docs/installation.md without editing.",
+      "platform": "codex",
+      "prerequisites": [
+        "Install Vale in Codex with plugin and lifecycle-hook support. Provide Python 3.11+ and Vale 3.23+. Native Windows isn't supported."
+      ],
+      "expected_behavior": "Report configured findings with their file, line, rule, and correction. Leave the document unchanged.",
+      "sources": [
+        {
+          "path": "docs/usage.md",
+          "format": "markdown",
+          "mode": "section",
+          "required": true,
+          "heading_path": ["Commands, skills, and examples", "Review without editing"]
+        },
+        {
+          "path": "docs/installation.md",
+          "format": "markdown",
+          "mode": "section",
+          "required": true,
+          "heading_path": ["Installation", "Requirements"]
+        }
+      ],
+      "evidence": "documented"
+    },
+    {
+      "id": "skill-google-prose-claude-code",
+      "capability_refs": ["skill:google-prose"],
+      "title": "Revise technical prose in Claude Code",
+      "input_or_trigger": "/vale:google-prose Write a setup guide for the existing server in docs/setup.md.",
+      "platform": "claude-code",
+      "prerequisites": [
+        "Install Vale in Claude Code with plugin and lifecycle-hook support. Provide Python 3.11+ and Vale 3.23+. Native Windows isn't supported."
+      ],
+      "expected_behavior": "Write or revise technical prose in Google documentation style, preserve commands and meaning, and verify the result with Vale.",
+      "sources": [
+        {
+          "path": "docs/usage.md",
+          "format": "markdown",
+          "mode": "section",
+          "required": true,
+          "heading_path": ["Commands, skills, and examples", "Write new documentation"]
+        },
+        {
+          "path": "docs/usage.md",
+          "format": "markdown",
+          "mode": "section",
+          "required": true,
+          "heading_path": ["Commands, skills, and examples", "Fix findings"]
+        },
+        {
+          "path": "docs/installation.md",
+          "format": "markdown",
+          "mode": "section",
+          "required": true,
+          "heading_path": ["Installation", "Requirements"]
+        }
+      ],
+      "evidence": "documented"
+    },
+    {
+      "id": "skill-google-prose-codex",
+      "capability_refs": ["skill:google-prose"],
+      "title": "Revise technical prose in Codex",
+      "input_or_trigger": "$vale:google-prose Rewrite the installation section for a first-time contributor.",
+      "platform": "codex",
+      "prerequisites": [
+        "Install Vale in Codex with plugin and lifecycle-hook support. Provide Python 3.11+ and Vale 3.23+. Native Windows isn't supported."
+      ],
+      "expected_behavior": "Revise technical prose, preserve commands and meaning, and verify the result with Vale. Report unresolved findings.",
+      "sources": [
+        {
+          "path": "docs/usage.md",
+          "format": "markdown",
+          "mode": "section",
+          "required": true,
+          "heading_path": ["Commands, skills, and examples", "Write new documentation"]
+        },
+        {
+          "path": "docs/usage.md",
+          "format": "markdown",
+          "mode": "section",
+          "required": true,
+          "heading_path": ["Commands, skills, and examples", "Fix findings"]
+        },
+        {
+          "path": "docs/installation.md",
+          "format": "markdown",
+          "mode": "section",
+          "required": true,
+          "heading_path": ["Installation", "Requirements"]
+        }
+      ],
+      "evidence": "documented"
+    },
+    {
+      "id": "skill-procedural-prose-claude-code",
+      "capability_refs": ["skill:procedural-prose"],
+      "title": "Revise a procedure in Claude Code",
+      "input_or_trigger": "/vale:procedural-prose Rewrite this procedure as a clear procedure: \"If the backup succeeds, stop the service and install the update.\" Preserve the condition and action order.",
+      "platform": "claude-code",
+      "prerequisites": [
+        "Install Vale in Claude Code with plugin and lifecycle-hook support. Provide Python 3.11+ and Vale 3.23+. Native Windows isn't supported. The procedural skill is experimental."
+      ],
+      "expected_behavior": "For the example condition, keep the condition before two ordered steps: stop the service, then install the update. This is illustrative guidance, not an evaluated result or ASD-STE100 certification.",
+      "sources": [
+        {
+          "path": "docs/usage.md",
+          "format": "markdown",
+          "mode": "section",
+          "required": true,
+          "heading_path": ["Commands, skills, and examples", "Revise a procedure"]
+        },
+        {
+          "path": "docs/installation.md",
+          "format": "markdown",
+          "mode": "section",
+          "required": true,
+          "heading_path": ["Installation", "Requirements"]
+        }
+      ],
+      "evidence": "documented"
+    },
+    {
+      "id": "skill-procedural-prose-codex",
+      "capability_refs": ["skill:procedural-prose"],
+      "title": "Revise a procedure in Codex",
+      "input_or_trigger": "$vale:procedural-prose Rewrite this procedure as a clear procedure: \"If the backup succeeds, stop the service and install the update.\" Preserve the condition and action order.",
+      "platform": "codex",
+      "prerequisites": [
+        "Install Vale in Codex with plugin and lifecycle-hook support. Provide Python 3.11+ and Vale 3.23+. Native Windows isn't supported. The procedural skill is experimental."
+      ],
+      "expected_behavior": "For the example condition, keep the condition before two ordered steps: stop the service, then install the update. This is illustrative guidance, not an evaluated result or ASD-STE100 certification.",
+      "sources": [
+        {
+          "path": "docs/usage.md",
+          "format": "markdown",
+          "mode": "section",
+          "required": true,
+          "heading_path": ["Commands, skills, and examples", "Revise a procedure"]
+        },
+        {
+          "path": "docs/installation.md",
+          "format": "markdown",
+          "mode": "section",
+          "required": true,
+          "heading_path": ["Installation", "Requirements"]
+        }
+      ],
+      "evidence": "documented"
+    }
+  ],
+  "platforms": {
+    "claude-code": {
+      "status": "documented",
+      "notes": "Invoke skills as namespaced slash commands. The shared lifecycle hooks require a supported Claude Code plugin runtime. The host requires Python 3.11+ and Vale 3.23+; native Windows isn't supported.",
+      "sources": [
+        {
+          "path": "docs/usage.md",
+          "format": "markdown",
+          "mode": "section",
+          "required": true,
+          "heading_path": ["Commands, skills, and examples", "Choose how to run Vale"]
+        },
+        {
+          "path": "docs/installation.md",
+          "format": "markdown",
+          "mode": "section",
+          "required": true,
+          "heading_path": ["Installation", "Requirements"]
+        }
+      ]
+    },
+    "codex": {
+      "status": "documented",
+      "notes": "Invoke skills with $vale:skill-name or select them with /skills. Review and trust hooks in /hooks. Codex 0.158.0 doesn't recognize /prompts:vale; only older clients that support custom prompts can use the separate legacy template. The host requires Python 3.11+ and Vale 3.23+; native Windows isn't supported.",
+      "sources": [
+        {
+          "path": "docs/usage.md",
+          "format": "markdown",
+          "mode": "section",
+          "required": true,
+          "heading_path": ["Commands, skills, and examples", "Choose how to run Vale"]
+        },
+        {
+          "path": "docs/installation.md",
+          "format": "markdown",
+          "mode": "section",
+          "required": true,
+          "heading_path": ["Installation", "Codex plugin"]
+        },
+        {
+          "path": "docs/installation.md",
+          "format": "markdown",
+          "mode": "section",
+          "required": true,
+          "heading_path": ["Installation", "Codex plugin", "Legacy slash command compatibility"]
+        },
+        {
+          "path": "docs/installation.md",
+          "format": "markdown",
+          "mode": "section",
+          "required": true,
+          "heading_path": ["Installation", "Requirements"]
+        }
+      ]
+    },
+    "windows": {
+      "status": "unsupported",
+      "notes": "Native Windows isn't supported because the runtime uses fcntl for state locking. Windows Subsystem for Linux is supported.",
+      "sources": [
+        {
+          "path": "docs/installation.md",
+          "format": "markdown",
+          "mode": "section",
+          "required": true,
+          "heading_path": ["Installation", "Requirements"]
+        }
+      ]
+    },
+    "slack": {
+      "status": "not_documented",
+      "notes": "The repository doesn't document a Slack integration.",
+      "sources": []
+    }
+  },
+  "mcpServers": {},
+  "hooks": [
+    {
+      "target": {
+        "path": "plugins/vale/hooks/hooks.json",
+        "pointer": "/hooks/PreToolUse/0/hooks/0"
+      },
+      "description": "When the first tool call starts a new session, establish the workspace file-state baseline and return empty JSON on success without linting unchanged files.",
+      "sources": [
+        {
+          "path": "docs/behavior.md",
+          "format": "markdown",
+          "mode": "section",
+          "required": true,
+          "heading_path": ["How the hook works", "Hook lifecycle", "Concrete hook examples"]
+        }
+      ]
+    },
+    {
+      "target": {
+        "path": "plugins/vale/hooks/hooks.json",
+        "pointer": "/hooks/PostToolUse/0/hooks/0"
+      },
+      "description": "After a tool changes an eligible document and Vale finds a configured issue, check the changed file and add findings to model context while preserving the tool's original output and exit status.",
+      "sources": [
+        {
+          "path": "docs/behavior.md",
+          "format": "markdown",
+          "mode": "section",
+          "required": true,
+          "heading_path": ["How the hook works", "Hook lifecycle", "Concrete hook examples"]
+        }
+      ]
+    },
+    {
+      "target": {
+        "path": "plugins/vale/hooks/hooks.json",
+        "pointer": "/hooks/Stop/0/hooks/0"
+      },
+      "description": "When the agent is ready to finish with findings remaining in a touched file, check it and request one correction pass. On the active retry, report remaining findings without requesting another continuation.",
+      "sources": [
+        {
+          "path": "docs/behavior.md",
+          "format": "markdown",
+          "mode": "section",
+          "required": true,
+          "heading_path": ["How the hook works", "Hook lifecycle", "Concrete hook examples"]
+        }
+      ]
+    }
+  ],
+  "changelog": null
+}
