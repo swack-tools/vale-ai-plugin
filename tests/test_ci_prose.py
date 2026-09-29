@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -262,3 +263,37 @@ class SelectionTests(unittest.TestCase):
         push = self.cli(base=target, event='push')
         self.assertEqual(push.returncode, 1, push.stdout + push.stderr)
         self.assertIn('title=Google.Will', push.stdout)
+
+    def test_dangling_document_symlink_is_diagnosed(self):
+        (self.root / 'docs/dangling.md').symlink_to('missing.md')
+        self.commit()
+        self.assertEqual(self.select(), ['docs/dangling.md'])
+        self.assertEqual(self.cli().returncode, 2)
+        report = json.loads((self.root / 'report.json').read_text())
+        self.assertEqual(report['errors'][0]['code'], 'unsupported_path')
+
+    def test_nested_summary_directory_preserves_check_result(self):
+        (self.root / 'docs/test.md').write_text('Use the file.\n')
+        self.commit()
+        for base, directory in ((self.base, 'reports/clean'), (self.git('rev-parse', 'HEAD').strip(), 'reports/empty')):
+            summary = self.root / directory / 'summary.md'
+            with contextlib.redirect_stdout(io.StringIO()):
+                code = self.ci.main(['--base', base, '--head', self.git('rev-parse', 'HEAD').strip(),
+                    '--output', str(self.root / 'report.json'), '--summary', str(summary)])
+            self.assertEqual(code, 0)
+            self.assertTrue(summary.is_file())
+            self.assertIn(json.loads((self.root / 'report.json').read_text())['status'], ('clean', 'no-applicable-files'))
+
+    def test_git_filename_bytes_survive_selection(self):
+        # macOS cannot create these filenames. Model only the Git byte transport
+        # and that filesystem capability; execute the actual selection/policy.
+        original_git, original_is_file = self.ci.git, Path.is_file
+        def raw_diff(root, *args):
+            if '--diff-filter=ACMR' in args:
+                return b'docs/bad\xff.md\0'
+            return original_git(root, *args)
+        def file_exists(path):
+            return os.fsencode(path.name) == b'bad\xff.md' or original_is_file(path)
+        with patch.object(self.ci, 'git', side_effect=raw_diff), patch.object(Path, 'is_file', file_exists):
+            names = self.select()
+        self.assertEqual([os.fsencode(name) for name in names], [b'docs/bad\xff.md'])

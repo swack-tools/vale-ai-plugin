@@ -121,6 +121,7 @@ def publish(result, output, summary=None):
     shown_errors = min(PER_LEVEL_LIMIT, len(result['errors']))
     shown_findings = min(len(annotations) - shown_errors, len(result['findings']))
     if summary:
+        summary.parent.mkdir(parents=True, exist_ok=True)
         with summary.open('a', encoding='utf-8') as stream:
             stream.write(f"## Prose check\n\nStatus: {result['status']}. "
                          f"{len(result['findings'])} findings: {shown_findings} shown, "
@@ -162,10 +163,10 @@ def changed_documents(root, base, head, event='push'):
         if event == 'pull_request':
             base = git(root, 'merge-base', base, head).decode('ascii').strip()
         raw = git(root, 'diff', '--name-only', '-z', '--diff-filter=ACMR', '--find-renames', base, head, '--')
-    names = raw.decode('utf-8').split('\0')
+    names = os.fsdecode(raw).split('\0')
     candidates = [name for name in names if name and any(
         name.startswith(prefix) if prefix.endswith('/') else name == prefix for prefix in DOCUMENT_ROOTS)
-        and (root / name).is_file()]
+        and ((root / name).is_symlink() or (root / name).is_file())]
     if not candidates:
         return []
     # Automatic discovery uses the same predicates as local snapshots. Keep
@@ -197,7 +198,7 @@ def main(argv=None):
     args = parser.parse_args(argv)
     root = Path.cwd().resolve()
     try:
-        repository = git(root, 'rev-parse', '--show-toplevel').decode('utf-8').strip()
+        repository = os.fsdecode(git(root, 'rev-parse', '--show-toplevel')).strip()
         if Path(repository).resolve() != root:
             raise ValueError('Run the CI checker from the repository root.')
         names = changed_documents(root, args.base, args.head, args.event)
@@ -209,6 +210,7 @@ def main(argv=None):
             message = 'No applicable changed documentation files; no prose check ran.'
             print(message)
             if args.summary:
+                args.summary.parent.mkdir(parents=True, exist_ok=True)
                 with args.summary.open('a', encoding='utf-8') as stream:
                     stream.write('## Prose check\n\n' + message + '\n')
             return 0
