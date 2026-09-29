@@ -101,6 +101,26 @@ class ResultTests(unittest.TestCase):
         self.assertTrue(result['errors'])
         self.assertEqual(result['submitted_files'], [])
 
+    def test_spanless_findings_survive_with_valid_neighbors(self):
+        alerts = [ALERT, dict(ALERT, Span=None), dict(ALERT, Line=None, Span=None), dict(ALERT, Span=[])]
+        self.fake_vale(f'print(json.dumps({{sys.argv[-1]: {alerts!r}}}))')
+        code, result = self.check()
+        self.assertEqual(code, 2)
+        self.assertEqual(len(result['findings']), 3)
+        self.assertEqual([(f['line'], f['column'], f['end_column']) for f in result['findings']],
+                         [(1, 1, 2), (1, None, None), (None, None, None)])
+        self.assertEqual([issue['code'] for issue in result['errors']], ['invalid_alert'])
+
+    def test_text_output_does_not_invent_missing_coordinates(self):
+        alerts = [dict(ALERT, Span=None), dict(ALERT, Line=None, Span=None)]
+        self.fake_vale(f'print(json.dumps({{sys.argv[-1]: {alerts!r}}}))')
+        result = subprocess.run([sys.executable, str(HOOK), '--format', 'text', '--check', self.file.name],
+                                cwd=self.root, env=self.env, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn(f'{self.file.name}:1:?:House.Example:Use another word.', result.stdout)
+        self.assertIn(f'{self.file.name}:?:?:House.Example:Use another word.', result.stdout)
+        self.assertNotIn('None', result.stdout)
+
     def test_excluded_operand_is_skipped(self):
         excluded = self.root / 'vendor/f.md'
         excluded.parent.mkdir()

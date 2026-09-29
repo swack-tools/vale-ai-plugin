@@ -53,6 +53,22 @@ class RenderTests(unittest.TestCase):
                 self.assertNotIn('file=', annotation)
                 self.assertNotIn('line=', annotation)
 
+    def test_missing_source_location_is_accepted_without_fake_annotation_position(self):
+        data = result()
+        data['findings'][0].update(line=None, column=None, end_column=None)
+        annotation, = self.ci.render_annotations(data)
+        self.assertIn('title=Google.Will', annotation)
+        self.assertNotIn('file=', annotation)
+        self.assertNotIn('line=', annotation)
+        self.assertNotIn('col=', annotation)
+
+        data = result()
+        data['findings'][0].update(column=None, end_column=None)
+        annotation, = self.ci.render_annotations(data)
+        self.assertIn('file=docs/test.md,line=1,title=Google.Will', annotation)
+        self.assertNotIn('col=', annotation)
+        self.assertNotIn('endColumn=', annotation)
+
     def test_symlink_and_stale_line_have_no_location(self):
         (self.root / 'link.md').symlink_to(self.root / 'docs/test.md')
         self.assertNotIn('file=', self.ci.render_annotations(result('link.md'))[0])
@@ -120,6 +136,11 @@ class RenderTests(unittest.TestCase):
             data = result()
             data['findings'][0][field] = value
             with self.subTest(field=field), self.assertRaises(ValueError):
+                self.ci.render_annotations(data)
+        for coordinates in ((None, 1, None), (1, None, 2), (None, None, 2)):
+            data = result()
+            data['findings'][0].update(zip(('line', 'column', 'end_column'), coordinates))
+            with self.subTest(coordinates=coordinates), self.assertRaises(ValueError):
                 self.ci.render_annotations(data)
 
 

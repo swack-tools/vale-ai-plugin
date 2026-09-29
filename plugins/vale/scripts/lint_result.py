@@ -6,8 +6,8 @@ import json
 @dataclass
 class Finding:
     path: str
-    line: int
-    column: int
+    line: int | None
+    column: int | None
     end_column: int | None
     rule: str
     severity: str
@@ -71,7 +71,8 @@ def one_line(value):
 
 def render_text(result, limit=None, *, prefix='', suffix='', report_path=None):
     """Render only whole entries; count metadata and adapter copy in the budget."""
-    entries = [f'{one_line(f.path)}:{f.line}:{f.column}:{one_line(f.rule)}:{one_line(f.message)}'
+    entries = [f'{one_line(f.path)}:{f.line if f.line is not None else "?"}:'
+               f'{f.column if f.column is not None else "?"}:{one_line(f.rule)}:{one_line(f.message)}'
                for f in result.actionable_findings]
     errors = [f'Vale could not complete the check: {one_line(e.message)}' for e in result.errors]
     if result.comparison is not None:
