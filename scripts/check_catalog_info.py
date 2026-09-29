@@ -75,15 +75,19 @@ def _heading_matches(text: str, path: list[str]) -> int:
 
 def _source_entries(data):
     found = []
-    def walk(value, *, in_target=False):
+    def walk(value, *, in_target=False, in_source=False):
         if isinstance(value, dict):
-            if not in_target and isinstance(value.get("path"), str):
+            if not in_target and (in_source or "path" in value):
                 found.append(value)
             for key, item in value.items():
-                walk(item, in_target=in_target or key == "target")
+                walk(
+                    item,
+                    in_target=in_target or key == "target",
+                    in_source=not in_target and key in {"source", "sources"},
+                )
         elif isinstance(value, list):
             for item in value:
-                walk(item, in_target=in_target)
+                walk(item, in_target=in_target, in_source=in_source)
     walk(data)
     return found
 
@@ -187,9 +191,14 @@ def validate(root: Path, data: dict | None = None) -> list[str]:
     examples = data.get("examples", [])
     if not isinstance(examples, list):
         examples = []
+    platforms = data.get("platforms", {})
+    if not isinstance(platforms, dict):
+        platforms = {}
     for example in examples:
         if not isinstance(example, dict):
             continue
+        if example.get("platform") not in platforms:
+            errors.append(f"example references undeclared platform: {example.get('platform')}")
         refs = example.get("capability_refs", [])
         if not isinstance(refs, list):
             continue
@@ -240,7 +249,6 @@ def validate(root: Path, data: dict | None = None) -> list[str]:
         errors.append("metadata declares unknown native hook target")
     for _target in hook_targets - declared:
         errors.append("native hook is missing a catalog note")
-    platforms = data.get("platforms", {})
     if isinstance(platforms, dict):
         for name, platform in platforms.items():
             if not isinstance(platform, dict) or platform.get("status") not in {"documented", "unsupported"}:

@@ -113,6 +113,18 @@ class CatalogInfoTests(unittest.TestCase):
         data["hooks"] = [{"target": {"path": "plugins/missing/hooks.json", "pointer": "/hooks/Unknown/0/hooks/0"}}]
         self.assertTrue(any("hook target" in error for error in checker.validate(ROOT, data)))
 
+    def test_missing_hook_source_path_is_rejected(self):
+        data = json.loads((ROOT / "catalog-info.json").read_text())
+        data["hooks"][0]["sources"][0].pop("path")
+        errors = checker.validate(ROOT, data)
+        self.assertTrue(any("catalog source path must be a string" in error for error in errors))
+
+    def test_example_must_reference_declared_platform(self):
+        data = json.loads((ROOT / "catalog-info.json").read_text())
+        data["examples"][0]["platform"] = "claud-code"
+        errors = checker.validate(ROOT, data)
+        self.assertTrue(any("example references undeclared platform: claud-code" in error for error in errors))
+
     def test_path_escape_is_rejected(self):
         data = json.loads((ROOT / "catalog-info.json").read_text())
         data["examples"][0]["sources"][0]["path"] = "../outside.md"
