@@ -15,9 +15,16 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'plugins/vale/scripts'))
 from deadline import run_process
 
+FIXTURE_CONTENT = b'# Doc\n'
 FIXTURE = dict(description='One Python comment per file; the hook receives Read tool events.',
-               extension='.py', bytes_per_file=len('# Doc\n'.encode('utf-8')),
+               extension='.py', bytes_per_file=len(FIXTURE_CONTENT),
                tool_name='Read', events=['PreToolUse', 'PostToolUse'], warmup_runs_per_event=1)
+
+
+def create_fixture_files(root, count):
+    """Write benchmark fixtures with stable, platform-independent bytes."""
+    for number in range(count):
+        (root / f'f{number}.py').write_bytes(FIXTURE_CONTENT)
 
 
 def bounded_count(value):
@@ -49,8 +56,7 @@ def benchmark(count, samples):
     with tempfile.TemporaryDirectory(prefix='vale-benchmark-') as tmp:
         root = Path(tmp).resolve()
         subprocess.run(['git', 'init', '-q', str(root)], check=True)
-        for number in range(count):
-            (root / f'f{number}.py').write_text('# Doc\n')
+        create_fixture_files(root, count)
         timings = {}
         for event in ('PreToolUse', 'PostToolUse'):
             measurements = []

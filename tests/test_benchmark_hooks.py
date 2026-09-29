@@ -13,6 +13,15 @@ import benchmark_hooks
 
 
 class BenchmarkMetadataTests(unittest.TestCase):
+    def test_fixture_files_match_the_reported_byte_size(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            benchmark_hooks.create_fixture_files(root, 2)
+            files = sorted(root.glob('f*.py'))
+            self.assertEqual(len(files), 2)
+            self.assertEqual([path.read_bytes() for path in files], [b'# Doc\n', b'# Doc\n'])
+            self.assertEqual(len(files[0].read_bytes()), benchmark_hooks.FIXTURE['bytes_per_file'])
+
     def test_revision_and_engine_probes_are_bounded_and_optional(self):
         root = Path('/tmp/benchmark-root')
         with patch.object(benchmark_hooks, 'run_process', side_effect=[
