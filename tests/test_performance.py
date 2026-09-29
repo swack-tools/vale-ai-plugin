@@ -169,7 +169,7 @@ class PerformanceTests(unittest.TestCase):
             (self.root / name).write_text('We will use this file.\n')
         alert = dict(Check='House.Example', Line=1, Span=[1, 2], Severity='warning',
                      Message='Use another word.', Match='We')
-        completed = subprocess.CompletedProcess([], 0, json.dumps({str(self.root / names[0]): [alert]}), '')
+        completed = subprocess.CompletedProcess([], 0, json.dumps({names[0]: [alert]}), '')
         with patch('vale_runner.run_process', side_effect=[completed, module.DeadlineExceeded('budget expired'),
                                                           AssertionError('started a batch after timeout')]) as runner:
             response = self.event('PostToolUse')
