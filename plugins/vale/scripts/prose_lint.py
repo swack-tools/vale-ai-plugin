@@ -340,7 +340,7 @@ def check_stdin(root, args, policy, deadline):
         except UnicodeDecodeError:
             result.errors.append(Issue('input_encoding', 'Draft must be valid UTF-8.', identity))
             return result.finish()
-        result = vale_runner.check_document(root, text, name, deadline=deadline, policy=policy)
+        result = vale_runner.check_document(root, text, name, deadline=deadline, policy=policy, relative_identity=True)
     except (OSError, ValueError, RuntimeError, subprocess.TimeoutExpired) as exc:
         result.errors.append(Issue('check_error', str(exc), identity))
         result.finish()
