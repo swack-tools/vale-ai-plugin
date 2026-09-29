@@ -5,7 +5,7 @@ import re
 import shutil
 import subprocess
 
-from deadline import Deadline, DeadlineExceeded, OutputLimitExceeded, run_process
+from deadline import Deadline, DeadlineExceeded, run_process
 from vale_runner import empty_result
 from policy import EXTENSIONS, load_policy
 
