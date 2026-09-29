@@ -110,9 +110,17 @@ python3 scripts/benchmark_hooks.py --files 1000 4000 20000 --samples 5 --output 
 
 The benchmark uses disposable Git repositories and measures complete hook
 processes after one warm-up per event. It records medians, individual samples,
-and state writes. Compare runs on the same machine. Results depend on filesystem
-and system load. Unit tests verify that repeated pre-tool events skip discovery
-and unchanged events preserve state, without machine-specific timing thresholds.
+state writes, the current plugin commit, and the detected Vale version. Each
+metadata probe has a two-second timeout and a bounded output capture. If Git or
+Vale is unavailable, the matching metadata value is `null`. The benchmark still
+runs.
+
+The `fixture` object describes one Python comment per file. Each file contains
+six bytes. The hook receives the `Read` tool event. The benchmark records
+pre-tool and post-tool events and one warm-up run per event. Compare runs on the
+same machine. Results depend on filesystem and system load. Unit tests verify
+that repeated pre-tool events skip discovery and unchanged events preserve state,
+without machine-specific timing thresholds.
 
 A local macOS comparison with 20,000 small Python files alternated the old and
 new hooks over five samples after a warm-up. Repeated pre-tool events measured
