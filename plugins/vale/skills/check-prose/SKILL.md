@@ -107,8 +107,9 @@ modes. For requested fixes, preserve commands and technical meaning, revise only
 the draft, and submit it again. Report rule counts before and after. The workflow creates no hook
 state or user file and doesn't automatically check assistant replies.
 
-Project patterns can distinguish relative draft paths from absolute file paths.
-The tested `[**/docs/*.md]` pattern matches both. `[docs/*.md]` only matches the
-relative draft identity in Vale 3.23. Don't change project rules silently or
-claim an unmatched empty result proves coverage. See the
+Saved files and drafts use normalized root-relative identities for project
+patterns, so `[docs/*.md]` can match both. The checker still resolves and
+validates saved files against the absolute workspace root and returns absolute
+file locations. Don't change project rules silently or claim an unmatched
+empty result proves coverage. See the
 [draft guide](https://vale.swacktech.com/usage.html#check-an-unsaved-draft).

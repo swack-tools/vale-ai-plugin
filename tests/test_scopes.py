@@ -46,7 +46,7 @@ class ScopeTests(unittest.TestCase):
         return json.loads(result.stdout)
 
     def compare(self, *args):
-        result = self.cli('--check', self.file.name, '--scope', 'new-findings', '--base-ref', 'HEAD', '--format', 'json', *args)
+        result = self.cli('--check', str(self.file.relative_to(self.root)), '--scope', 'new-findings', '--base-ref', 'HEAD', '--format', 'json', *args)
         self.assertIn(result.returncode, (0, 1), result.stderr + result.stdout)
         return json.loads(result.stdout)
 
@@ -158,6 +158,64 @@ class ScopeTests(unittest.TestCase):
         self.assertEqual(len(result.findings), 1)
         self.assertEqual(result.findings[0].path, str(self.root / 'GUIDE.MD'))
         self.assertEqual(result.findings[0].line, 1)
+
+    def test_project_relative_glob_matches_saved_files_and_drafts(self):
+        runner = importlib.import_module('vale_runner')
+        (self.root / '.vale.ini').write_text(
+            f'StylesPath = {ROOT / "plugins/vale/styles"}\n'
+            'MinAlertLevel = suggestion\n'
+            '[docs/*.md]\nBasedOnStyles = Google\n'
+            '[*.md]\nBasedOnStyles = Google\n'
+        )
+        documents = {
+            'docs/setup.md': self.root / 'docs' / 'setup.md',
+            'docs/a file.md': self.root / 'docs' / 'a file.md',
+            'docs/-draft.md': self.root / 'docs' / '-draft.md',
+            '-draft.md': self.root / '-draft.md',
+        }
+        for path in documents.values():
+            path.parent.mkdir(exist_ok=True)
+            path.write_text(OLD)
+
+        saved = runner.run_check(self.root, list(documents))
+        self.assertEqual({f.path for f in saved.findings if f.rule == 'Google.Latin'},
+                         {str(path) for path in documents.values()})
+        absolute_cli = self.cli('--check', str(documents['docs/a file.md']), '--format', 'json')
+        self.assertEqual(absolute_cli.returncode, 1, absolute_cli.stdout + absolute_cli.stderr)
+        self.assertEqual(json.loads(absolute_cli.stdout)['submitted_files'], ['docs/a file.md'])
+        for name, path in documents.items():
+            draft = runner.check_document(self.root, OLD, name, relative_identity=True)
+            self.assertTrue(any(f.rule == 'Google.Latin' for f in draft.findings), name)
+            self.assertTrue(all(f.path == str(path) for f in draft.findings), name)
+
+    def test_project_relative_glob_maps_baseline_and_falls_back_conservatively(self):
+        runner = importlib.import_module('vale_runner')
+        finding_diff = importlib.import_module('finding_diff')
+        self.file = self.root / 'docs' / 'setup.md'
+        self.file.parent.mkdir()
+        self.file.write_text(OLD)
+        (self.root / '.vale.ini').write_text(
+            f'StylesPath = {ROOT / "plugins/vale/styles"}\n'
+            'MinAlertLevel = suggestion\n'
+            '[docs/*.md]\nBasedOnStyles = Google\n'
+        )
+        before = runner.check_document(self.root, OLD, 'docs/setup.md')
+        self.assertEqual(len(before.findings), 1)
+        self.assertEqual(before.findings[0].path, str(self.file))
+        self.git('add', '.')
+        self.git('-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '-qm', 'project policy')
+        self.file.write_text(NEW)
+        current = runner.run_check(self.root, ['docs/setup.md'])
+        classified = finding_diff.classify_findings(
+            OLD, NEW, before.findings, current.findings
+        )
+
+        self.assertEqual(len(classified.existing), 1)
+        self.assertEqual(len(classified.new), 1)
+        self.assertTrue(all(item.path == str(self.file) for item in current.findings))
+        report = self.compare()
+        self.assertIn('project policy', report['comparison']['fallback_reason'])
+        self.assertEqual(report['comparison']['new'], len(report['findings']))
 
     def test_unchanged_old_finding_is_clean_in_comparison(self):
         result = self.compare()

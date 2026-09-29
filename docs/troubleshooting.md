@@ -55,8 +55,10 @@ and dependencies.
 
 Vale uses the shared Codex and Claude Code event contract, snapshots all tool calls, preserves tool
 output, and adds a Stop check. It uses no `jq` dependency and doesn't silently
-skip missing Vale. It passes absolute file paths after `--` to protect filenames
-that resemble command options.
+skip missing Vale. It validates file paths against the absolute workspace root,
+then passes normalized root-relative paths after `--` so project-relative Vale
+patterns work and filenames can't become command options. Findings map back to
+absolute paths.
 
 Install Vale first, inspect the merged configuration, and remove only the old
 prose-lint registration when migrating. Preserve unrelated hooks. If the

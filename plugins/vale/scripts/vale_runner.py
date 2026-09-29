@@ -46,6 +46,24 @@ def configuration(root, policy=None):
     return PACKAGE / '.vale.ini'
 
 
+def _vale_path(root, path):
+    """Return a safe workspace-relative identity for Vale's project globs."""
+    relative = path.relative_to(root).as_posix()
+    # The caller also supplies `--`, but keep option-looking names unambiguous
+    # across Vale versions and operating systems.
+    if relative.startswith('-'):
+        relative = './' + relative
+    return relative
+
+
+def _map_vale_path(mapping, operand, result_path):
+    mapping[operand] = result_path
+    # Vale accepts the guarded ./ form for an option-looking basename but may
+    # omit that prefix in its JSON key.
+    if operand.startswith('./-'):
+        mapping[operand[2:]] = result_path
+
+
 def empty_result(root, names=(), policy=None):
     config = configuration(root, policy)
     source = 'project' if config == root / '.vale.ini' else 'bundled'
@@ -136,7 +154,8 @@ def run_check(root, names, *, deadline=None, documents=None, policy=None):
         result.errors.append(Issue('missing_vale', 'Vale is missing from PATH. Install Vale 3.23 or later, then restart your coding agent.'))
         return result.finish()
     jobs = [(paths[i:i+50], None) for i in range(0, len(paths), 50)]
-    jobs += [([pair], str(pair[1].with_suffix(pair[1].suffix.lower())) if result.coverage.source == 'bundled' else str(pair[1])) for pair in aliases]
+    jobs += [([pair], str(pair[1].with_suffix(pair[1].suffix.lower())) if result.coverage.source == 'bundled'
+              else _vale_path(root, pair[1])) for pair in aliases]
     return _execute(root, result, jobs, deadline, vale, captured=documents)
 
 
@@ -162,15 +181,25 @@ def check_document(root, text, logical_path, *, deadline=None, policy=None, rela
     if result.errors:
         return result.finish()
     identity = Path(name) if relative_identity else path
+    if not relative_identity and result.coverage.source == 'project':
+        identity = Path(_vale_path(root, path))
     logical = str(identity.with_suffix(identity.suffix.lower())) if result.coverage.source == 'bundled' else str(identity)
-    return _execute(root, result, [([(name, path)], logical)], deadline, vale, document=text)
+    result_path = str(path)
+    return _execute(root, result, [([(name, path)], logical)], deadline, vale, document=text,
+                    result_paths={name: result_path})
 
 
-def _execute(root, result, jobs, deadline, vale, *, document=None, captured=None):
+def _execute(root, result, jobs, deadline, vale, *, document=None, captured=None, result_paths=None):
     captured_bytes = 0
     for batch, logical in jobs:
         command = [vale, '--no-global', '--config', result.config_path, '--output=JSON']
-        mapping = {str(path): str(path) for name, path in batch}
+        if logical:
+            mapping = {}
+            _map_vale_path(mapping, logical, (result_paths or {}).get(batch[0][0], str(batch[0][1])))
+        else:
+            mapping = {}
+            for name, path in batch:
+                _map_vale_path(mapping, _vale_path(root, path), str(path))
         try:
             deadline.check()
             content = None
@@ -191,9 +220,8 @@ def _execute(root, result, jobs, deadline, vale, *, document=None, captured=None
                     captured[batch[0][0]] = content if retained else None
                     if retained:
                         captured_bytes += size
-                mapping = {logical: str(path)}
             else:
-                command += ['--', *(str(path) for name, path in batch)]
+                command += ['--', *(_vale_path(root, path) for name, path in batch)]
             proc = run_process(command, input=content, cwd=root, deadline=deadline, timeout=20)
             try:
                 found, issues = decode_findings(proc.stdout, mapping)

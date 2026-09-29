@@ -114,11 +114,12 @@ editors don't confuse the virtual location with an existing file. Source lines
 and columns come from the original draft. Markdown code exclusions stay intact.
 
 For path-specific project rules, provide the intended target. The skill asks
-for it when it can't derive it. Vale 3.23 distinguishes relative stdin paths
-from the absolute operands used by file checks. In the tested configuration,
-`[**/docs/*.md]` matches both, while `[docs/*.md]` matches only the relative draft
-identity. Review your patterns deliberately. The checker doesn't rewrite them.
-Project rule coverage remains unknown even when no findings appear.
+for it when it can't derive it. Saved-file checks and draft checks use
+root-relative identities for Vale's project patterns, so a pattern such as
+`[docs/*.md]` can match either form. The checker validates saved paths against
+the absolute workspace root and reports findings with absolute file locations.
+It doesn't rewrite project patterns. Project rule coverage remains unknown even
+when no findings appear.
 
 The reader consumes at most 1 MiB plus one byte. More than 1 MiB or invalid UTF-8
 returns status `incomplete` and exit code `2`. An empty valid draft completes

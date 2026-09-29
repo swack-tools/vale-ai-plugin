@@ -169,7 +169,7 @@ class PerformanceTests(unittest.TestCase):
             (self.root / name).write_text('We will use this file.\n')
         alert = dict(Check='House.Example', Line=1, Span=[1, 2], Severity='warning',
                      Message='Use another word.', Match='We')
-        completed = subprocess.CompletedProcess([], 0, json.dumps({str(self.root / names[0]): [alert]}), '')
+        completed = subprocess.CompletedProcess([], 0, json.dumps({names[0]: [alert]}), '')
         with patch('vale_runner.run_process', side_effect=[completed, module.DeadlineExceeded('budget expired'),
                                                           AssertionError('started a batch after timeout')]) as runner:
             response = self.event('PostToolUse')
@@ -266,18 +266,45 @@ class PerformanceTests(unittest.TestCase):
             return proc
 
         child = 'import sys,time;sys.stdout.write("x"*1000);sys.stdout.flush();time.sleep(.03)'
+        kill_calls = 0
+
+        def transient_permission_after_exit(pid, sig):
+            nonlocal kill_calls
+            kill_calls += 1
+            if kill_calls == 1:
+                processes[0].wait(timeout=1)
+                raise PermissionError('transient exit race')
+            raise ProcessLookupError('group has exited')
+
         with patch.object(module.subprocess, 'Popen', side_effect=spawn_with_one_stale_poll), \
-             patch.object(module.os, 'killpg', side_effect=[
-                 PermissionError('transient exit race'), ProcessLookupError('group has exited')]):
+             patch.object(module.os, 'killpg', side_effect=transient_permission_after_exit):
             with self.assertRaisesRegex(module.OutputLimitExceeded, 'capture limit'):
                 module.run_process([sys.executable, '-c', child], max_output=64)
         self.assertEqual(processes[0].returncode, 0)
 
     def test_transient_exit_permission_error_preserves_deadline_failure(self):
         module = self.deadline_module()
+        processes = []
+        real_popen = module.subprocess.Popen
+
+        def capture_process(*args, **kwargs):
+            proc = real_popen(*args, **kwargs)
+            processes.append(proc)
+            return proc
+
+        kill_calls = 0
+
+        def transient_permission_after_exit(pid, sig):
+            nonlocal kill_calls
+            kill_calls += 1
+            if kill_calls == 1:
+                processes[0].wait(timeout=1)
+                raise PermissionError('transient exit race')
+            raise ProcessLookupError('group has exited')
+
         child = 'import time;time.sleep(.03)'
-        with patch.object(module.os, 'killpg', side_effect=[
-                PermissionError('transient exit race'), ProcessLookupError('group has exited')]):
+        with patch.object(module.subprocess, 'Popen', side_effect=capture_process), \
+             patch.object(module.os, 'killpg', side_effect=transient_permission_after_exit):
             with self.assertRaisesRegex(module.DeadlineExceeded, 'deadline exceeded'):
                 module.run_process([sys.executable, '-c', child], deadline=module.Deadline(.005))
 
