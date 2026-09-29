@@ -11,9 +11,11 @@ CHECKER = Path(__file__).resolve().parents[1] / 'plugins/vale/scripts/prose_lint
 sys.path.insert(0, str(CHECKER.parent))
 from deadline import run_process
 from lint_result import Issue
+from policy import load_policy
 from vale_runner import empty_result
 
 LIMIT = 50
+PER_LEVEL_LIMIT = 10
 
 
 def validate_result(result):
@@ -92,12 +94,19 @@ def location(finding):
 
 def render_annotations(result: dict) -> list[str]:
     validate_result(result)
-    annotations = [command('error', issue['message'], {'title': issue['code']}) for issue in result['errors'][:LIMIT]]
-    for finding in result['findings'][:LIMIT - len(annotations)]:
+    annotations = [command('error', issue['message'], {'title': issue['code']})
+                   for issue in result['errors'][:PER_LEVEL_LIMIT]]
+    counts = {'error': len(annotations), 'warning': 0, 'notice': 0}
+    for finding in result['findings']:
+        level = {'suggestion': 'notice', 'warning': 'warning', 'error': 'error'}[finding['severity']]
+        if counts[level] >= PER_LEVEL_LIMIT:
+            continue
+        if len(annotations) >= LIMIT:
+            break
         props = location(finding)
         props['title'] = finding['rule']
-        level = {'suggestion': 'notice', 'warning': 'warning', 'error': 'error'}[finding['severity']]
         annotations.append(command(level, finding['message'], props))
+        counts[level] += 1
     if not annotations and result['status'] == 'skipped':
         annotations.append(command('error', 'No selected files were submitted by the checker; inspect the JSON report.', {}))
     return annotations
@@ -109,8 +118,8 @@ def publish(result, output, summary=None):
     output.write_text(json.dumps(result, ensure_ascii=True, indent=2) + '\n')
     for annotation in annotations:
         print(annotation)
-    shown_errors = min(LIMIT, len(result['errors']))
-    shown_findings = min(LIMIT - shown_errors, len(result['findings']))
+    shown_errors = min(PER_LEVEL_LIMIT, len(result['errors']))
+    shown_findings = min(len(annotations) - shown_errors, len(result['findings']))
     if summary:
         with summary.open('a', encoding='utf-8') as stream:
             stream.write(f"## Prose check\n\nStatus: {result['status']}. "
@@ -140,7 +149,7 @@ def resolve_commit(root, value):
     return git(root, 'rev-parse', '--verify', value + '^{commit}').decode('ascii').strip()
 
 
-def changed_documents(root, base, head):
+def changed_documents(root, base, head, event='push'):
     head = resolve_commit(root, head)
     if git(root, 'rev-parse', 'HEAD').decode('ascii').strip() != head:
         raise ValueError('Check out the requested head commit before checking documents.')
@@ -150,11 +159,19 @@ def changed_documents(root, base, head):
         raw = git(root, 'ls-tree', '-r', '--name-only', '-z', head)
     else:
         base = resolve_commit(root, base)
+        if event == 'pull_request':
+            base = git(root, 'merge-base', base, head).decode('ascii').strip()
         raw = git(root, 'diff', '--name-only', '-z', '--diff-filter=ACMR', '--find-renames', base, head, '--')
     names = raw.decode('utf-8').split('\0')
-    return [name for name in names if name and any(
+    candidates = [name for name in names if name and any(
         name.startswith(prefix) if prefix.endswith('/') else name == prefix for prefix in DOCUMENT_ROOTS)
         and (root / name).is_file()]
+    if not candidates:
+        return []
+    # Automatic discovery uses the same predicates as local snapshots. Keep
+    # selected unsafe paths for the checker to diagnose rather than hiding them.
+    policy = load_policy(root, {'scope': 'changed-files'})
+    return [name for name in candidates if policy.supports(name) and policy.selected(name)]
 
 
 def check_files(root, names):
@@ -174,6 +191,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--base', required=True)
     parser.add_argument('--head', required=True)
+    parser.add_argument('--event', choices=('push', 'pull_request'), default='push')
     parser.add_argument('--output', type=Path, default=Path('.research/ci-prose.json'))
     parser.add_argument('--summary', type=Path, default=os.environ.get('GITHUB_STEP_SUMMARY'))
     args = parser.parse_args(argv)
@@ -182,7 +200,7 @@ def main(argv=None):
         repository = git(root, 'rev-parse', '--show-toplevel').decode('utf-8').strip()
         if Path(repository).resolve() != root:
             raise ValueError('Run the CI checker from the repository root.')
-        names = changed_documents(root, args.base, args.head)
+        names = changed_documents(root, args.base, args.head, args.event)
         if not names:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             # Adapter status, not a fabricated clean checker result.

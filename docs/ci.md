@@ -15,12 +15,17 @@ python3 scripts/ci_prose.py --base "$BASE_SHA" --head "$HEAD_SHA"
 Check out the head commit first. Fetch both commits and their history. The
 adapter rejects branch names, missing commits, a different checked-out head,
 and modified tracked files. On an initial push with an all-zero base ID, it
-selects files from the head tree.
+selects files from the head tree. The default `--event push` compares the before
+and head trees. For a pull request, add `--event pull_request` to compare its
+merge base with the head. Target-branch-only changes don't become PR candidates.
 
 The candidate roots are `README.md`, `docs/`, `plugins/vale/skills/`, and
 `plugins/vale/prompts/`. Added, copied, modified, and renamed destinations are
 candidates. Deleted files and test fixtures outside these roots aren't checked.
-Git's null-delimited output preserves spaces and newlines in names.
+Git's null-delimited output preserves spaces and newlines in names. Automatic
+selection uses the shared policy's format and exclusion predicates. Image assets
+and policy-excluded paths aren't prose candidates. Selected symlinks and other
+unsafe file operands still produce checker diagnostics.
 
 The checker reviews **entire changed files**, including existing issues on
 unchanged lines. This isn't the opt-in `new-findings` comparison used by local
@@ -55,11 +60,16 @@ locations and structured results.
 No candidates produces `status: no-applicable-files` in the adapter report.
 It doesn't claim a repository-wide check. A checker result retains
 schema version 1, requested and submitted files, skips, coverage, and errors.
-Unsupported candidate files fail visibly. If policy excludes every candidate,
-the result remains skipped and exits with status `2`.
+If selection removes every candidate, the adapter reports no applicable files.
+If selected files reach the checker but it can't submit any, it exits with
+status `2` and preserves the diagnostics.
 
 The adapter emits at most 50 complete annotations, with operational errors
-first. The step summary reports total, shown, and omitted counts. Download the
+first. It also respects the runner's limit of ten entries per level, so this
+single step emits at most 30 annotations. Operational diagnostics and prose
+errors share the error budget. See the
+[runner implementation](https://github.com/actions/runner/blob/main/src/Runner.Worker/ExecutionContext.cs)
+for the platform limit. The step summary reports total, shown, and omitted counts. Download the
 `prose-check` artifact from the workflow run to inspect the complete
 `ci-prose.json` result. The workflow retains artifacts for seven days. Locally,
 the file defaults to `.research/ci-prose.json`. Use `--output PATH` to change it.
@@ -115,14 +125,15 @@ permissions:
   env:
     BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
     HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-  run: python .vale-ci/scripts/ci_prose.py --base "$BASE_SHA" --head "$HEAD_SHA"
+  run: python .vale-ci/scripts/ci_prose.py --base "$BASE_SHA" --head "$HEAD_SHA" --event "$GITHUB_EVENT_NAME"
 ```
 
 Use `pull_request` and the intended branch's `push` events. Don't run an
 untrusted checkout under `pull_request_target`, pass secrets, or grant
 `pull-requests: write`. Install the documented markup parsers for selected
 reStructuredText and AsciiDoc files. Keep the always-run artifact upload so a
-failed check retains its diagnostics.
+failed check retains its diagnostics. The upload explicitly includes the hidden
+report path, rather than uploading the whole scratch directory.
 
 To change candidate roots, maintain a reviewed copy of `DOCUMENT_ROOTS` in
 `scripts/ci_prose.py`. Entries ending in `/` select a directory prefix. Other

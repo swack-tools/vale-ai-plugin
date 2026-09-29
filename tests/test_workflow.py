@@ -60,3 +60,5 @@ class WorkflowTests(unittest.TestCase):
         self.assertNotIn('${{', run['run'])
         artifact = next(s for s in steps if 'actions/upload-artifact@' in s.get('uses', ''))
         self.assertEqual(artifact['if'], 'always()')
+        self.assertEqual(artifact['with']['include-hidden-files'], 'true')
+        self.assertEqual(artifact['with']['path'], '.research/ci-prose.json')

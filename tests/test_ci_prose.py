@@ -73,21 +73,41 @@ class RenderTests(unittest.TestCase):
     def test_display_cap_keeps_full_summary(self):
         data = result()
         data['findings'] *= 63
-        self.assertEqual(len(self.ci.render_annotations(data)), 50)
+        self.assertEqual(len(self.ci.render_annotations(data)), 10)
         with contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(self.ci.publish(data, self.root / 'report.json', self.root / 'summary.md'), 1)
         self.assertEqual(len(json.loads((self.root / 'report.json').read_text())['findings']), 63)
         summary = (self.root / 'summary.md').read_text()
         self.assertIn('63 findings', summary)
-        self.assertIn('13 omitted', summary)
+        self.assertIn('53 omitted', summary)
 
     def test_errors_have_priority_over_findings(self):
         data = result()
         data['findings'] *= 60
         data.update(status='incomplete', errors=[dict(code='engine_error', message='Broken.', path=None)])
         annotations = self.ci.render_annotations(data)
-        self.assertEqual(len(annotations), 50)
+        self.assertEqual(len(annotations), 11)
         self.assertTrue(annotations[0].startswith('::error'))
+
+    def test_per_level_limits_share_error_budget_with_operational_errors(self):
+        data = result()
+        template = data['findings'][0]
+        data['findings'] = []
+        for severity in ('error', 'warning', 'suggestion'):
+            for i in range(15):
+                finding = copy.deepcopy(template)
+                finding['severity'] = severity
+                data['findings'].append(finding)
+        data.update(status='incomplete', errors=[dict(code='engine_error', message='Broken.', path=None)] * 5)
+        annotations = self.ci.render_annotations(data)
+        self.assertEqual(len(annotations), 30)
+        for level in ('error', 'warning', 'notice'):
+            self.assertEqual(sum(a.startswith('::' + level + ' ') for a in annotations), 10)
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(self.ci.publish(data, self.root / 'report.json', self.root / 'summary.md'), 2)
+        summary = (self.root / 'summary.md').read_text()
+        self.assertIn('45 findings: 25 shown, 20 omitted', summary)
+        self.assertIn('5 errors: 5 shown, 0 omitted', summary)
 
     def test_invalid_schema_and_contradictory_status_are_rejected(self):
         for change in ({'schema_version': 2}, {'status': 'clean'}, {'findings': [None]}, {'errors': 'oops'}, {'comparison': {}}):
@@ -125,11 +145,11 @@ class SelectionTests(unittest.TestCase):
         self.assertTrue(hasattr(self.ci, 'changed_documents'), 'Changed document selection is not implemented')
         return self.ci.changed_documents(self.root, self.base, self.git('rev-parse', 'HEAD').strip())
 
-    def cli(self, head=None, base=None):
+    def cli(self, head=None, base=None, event=None):
         import subprocess
         return subprocess.run([os.sys.executable, str(ROOT / 'scripts/ci_prose.py'),
             '--base=' + (base or self.base), '--head=' + (head or self.git('rev-parse', 'HEAD').strip()),
-            '--output', str(self.root / 'report.json'), '--summary', str(self.root / 'summary.md')],
+            *(['--event', event] if event else []), '--output', str(self.root / 'report.json'), '--summary', str(self.root / 'summary.md')],
             cwd=self.root, text=True, capture_output=True)
 
     def test_renamed_doc_is_checked_at_destination(self):
@@ -199,3 +219,46 @@ class SelectionTests(unittest.TestCase):
         self.assertEqual([f['rule'] for f in data['findings']], ['Local.Term'])
         self.assertEqual(data['coverage']['source'], 'project')
         self.assertIsNone(data['comparison'])
+
+    def test_asset_only_change_is_not_a_prose_failure(self):
+        (self.root / 'docs/assets').mkdir()
+        (self.root / 'docs/assets/favicon.svg').write_text('<svg/>')
+        self.commit()
+        self.assertEqual(self.select(), [])
+        proc = self.cli()
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+        self.assertEqual(json.loads((self.root / 'report.json').read_text())['status'], 'no-applicable-files')
+
+    def test_initial_push_ignores_assets_and_project_exclusions(self):
+        (self.root / 'docs/icon.svg').write_text('<svg/>')
+        (self.root / 'docs/ignored.md').write_text('We will do this.')
+        (self.root / '.vale-plugin.toml').write_text('exclude = ["docs/ignored.md"]\n')
+        self.commit()
+        self.base = '0' * 40
+        self.assertEqual(self.select(), ['docs/test.md'])
+        self.assertEqual(self.cli().returncode, 1)
+        report = json.loads((self.root / 'report.json').read_text())
+        self.assertEqual(report['status'], 'findings')
+        self.assertEqual(report['errors'], [])
+
+    def test_selected_symlink_still_fails(self):
+        (self.root / 'docs/link.md').symlink_to('test.md')
+        self.commit()
+        self.assertEqual(self.select(), ['docs/link.md'])
+        proc = self.cli()
+        self.assertEqual(proc.returncode, 2, proc.stdout + proc.stderr)
+        self.assertEqual(json.loads((self.root / 'report.json').read_text())['errors'][0]['code'], 'unsupported_path')
+
+    def test_pr_ignores_target_only_changes_but_push_compares_trees(self):
+        (self.root / 'code.py').write_text('x = 1\n')
+        topic = self.commit()
+        self.git('checkout', '-q', '--detach', self.base)
+        (self.root / 'docs/test.md').write_text('Read the file.\n')
+        target = self.commit()
+        self.git('checkout', '-q', '--detach', topic)
+        pr = self.cli(base=target, event='pull_request')
+        self.assertEqual(pr.returncode, 0, pr.stdout + pr.stderr)
+        self.assertEqual(json.loads((self.root / 'report.json').read_text())['status'], 'no-applicable-files')
+        push = self.cli(base=target, event='push')
+        self.assertEqual(push.returncode, 1, push.stdout + push.stderr)
+        self.assertIn('title=Google.Will', push.stdout)

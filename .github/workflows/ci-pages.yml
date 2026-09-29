@@ -155,13 +155,14 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: python scripts/ci_prose.py --base "$BASE_SHA" --head "$HEAD_SHA"
+        run: python scripts/ci_prose.py --base "$BASE_SHA" --head "$HEAD_SHA" --event "$GITHUB_EVENT_NAME"
       - name: Retain full prose result
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: prose-check
           path: .research/ci-prose.json
+          include-hidden-files: true
           retention-days: 7
 
   build:
