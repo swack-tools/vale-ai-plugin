@@ -172,7 +172,7 @@ python3 plugins/vale/scripts/prose_lint.py --format json --check ./README.md
 Schema version `1` includes `status`, `config_path`, `requested_files`,
 `submitted_files`, `skipped_files`, `findings`, `errors`, and `coverage`.
 Findings retain rule, severity, message, source location, and available
-suggestion metadata. Vale can omit a line or span; the JSON result uses `null`
+suggestion metadata. Vale can omit a line or span. The JSON result uses `null`
 for unavailable coordinates. These findings remain actionable and are never
 suppressed by change comparison. Text output uses `?` for an unavailable
 coordinate. CI annotations include only source positions the checker received.
