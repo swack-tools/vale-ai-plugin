@@ -100,3 +100,102 @@ class RenderTests(unittest.TestCase):
             data['findings'][0][field] = value
             with self.subTest(field=field), self.assertRaises(ValueError):
                 self.ci.render_annotations(data)
+
+
+class SelectionTests(unittest.TestCase):
+    def setUp(self):
+        RenderTests.setUp(self)
+        self.git('init', '-q')
+        self.git('config', 'user.email', 'test@example.invalid')
+        self.git('config', 'user.name', 'Test')
+        self.git('add', '.')
+        self.git('commit', '-qm', 'base')
+        self.base = self.git('rev-parse', 'HEAD').strip()
+
+    def git(self, *args):
+        import subprocess
+        return subprocess.check_output(['git', *args], cwd=self.root, text=True)
+
+    def commit(self):
+        self.git('add', '-A')
+        self.git('commit', '-qm', 'change')
+        return self.git('rev-parse', 'HEAD').strip()
+
+    def select(self):
+        self.assertTrue(hasattr(self.ci, 'changed_documents'), 'Changed document selection is not implemented')
+        return self.ci.changed_documents(self.root, self.base, self.git('rev-parse', 'HEAD').strip())
+
+    def cli(self, head=None, base=None):
+        import subprocess
+        return subprocess.run([os.sys.executable, str(ROOT / 'scripts/ci_prose.py'),
+            '--base=' + (base or self.base), '--head=' + (head or self.git('rev-parse', 'HEAD').strip()),
+            '--output', str(self.root / 'report.json'), '--summary', str(self.root / 'summary.md')],
+            cwd=self.root, text=True, capture_output=True)
+
+    def test_renamed_doc_is_checked_at_destination(self):
+        self.git('mv', 'docs/test.md', 'docs/renamed.md')
+        self.commit()
+        self.assertEqual(self.select(), ['docs/renamed.md'])
+
+    def test_deleted_doc_is_skipped(self):
+        (self.root / 'docs/test.md').unlink()
+        self.commit()
+        self.assertEqual(self.select(), [])
+        proc = self.cli()
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertIn('No applicable changed documentation files', (self.root / 'summary.md').read_text())
+        self.assertEqual(json.loads((self.root / 'report.json').read_text())['status'], 'no-applicable-files')
+
+    def test_space_and_newline_filename(self):
+        for name in ('docs/a b.md', 'docs/a\nb.md'):
+            (self.root / name).write_text('Use the file.\n')
+        self.commit()
+        self.assertEqual(self.select(), ['docs/a\nb.md', 'docs/a b.md'])
+        self.assertEqual(self.cli().returncode, 0)
+
+    def test_existing_prose_in_changed_file_is_reported(self):
+        (self.root / 'docs/test.md').write_text('We will do this.\n\nUse the file.\n')
+        self.commit()
+        proc = self.cli()
+        self.assertEqual(proc.returncode, 1, proc.stderr + proc.stdout)
+        data = json.loads((self.root / 'report.json').read_text())
+        self.assertTrue(any(f['line'] == 1 and f['rule'] == 'Google.Will' for f in data['findings']))
+        self.assertIn('file=docs/test.md,line=1', proc.stdout)
+        self.assertIn('title=Google.Will', proc.stdout)
+        self.assertIsNone(data['comparison'])
+
+    def test_fixture_directory_is_not_selected(self):
+        (self.root / 'tests').mkdir()
+        (self.root / 'tests/bad.md').write_text('We will do this.\n')
+        self.commit()
+        self.assertEqual(self.select(), [])
+
+    def test_initial_push_selects_roots(self):
+        self.base = '0' * 40
+        self.assertEqual(self.select(), ['docs/test.md'])
+
+    def test_invalid_or_stale_commit_fails_without_commands(self):
+        for sha in ('--help', 'HEAD', 'f' * 40):
+            proc = self.cli(base=sha)
+            self.assertEqual(proc.returncode, 2)
+            self.assertIn('::error', proc.stdout)
+        (self.root / 'docs/test.md').write_text('Use the file.\n')
+        old = self.base
+        self.commit()
+        self.assertEqual(self.cli(head=old).returncode, 2)
+        (self.root / 'docs/test.md').write_text('Modified.\n')
+        self.assertEqual(self.cli().returncode, 2)
+
+    def test_project_policy_is_reused_but_comparison_is_not(self):
+        (self.root / '.vale.ini').write_text('StylesPath = styles\nMinAlertLevel = suggestion\n[*.md]\nBasedOnStyles = Local\n')
+        (self.root / 'styles/Local').mkdir(parents=True)
+        (self.root / 'styles/Local/Term.yml').write_text("extends: existence\nmessage: Avoid foobar.\nlevel: warning\ntokens:\n  - foobar\n")
+        (self.root / '.vale-plugin.toml').write_text('scope = "new-findings"\n')
+        (self.root / 'docs/test.md').write_text('Use foobar.\n')
+        self.commit()
+        proc = self.cli()
+        self.assertEqual(proc.returncode, 1, proc.stderr + proc.stdout)
+        data = json.loads((self.root / 'report.json').read_text())
+        self.assertEqual([f['rule'] for f in data['findings']], ['Local.Term'])
+        self.assertEqual(data['coverage']['source'], 'project')
+        self.assertIsNone(data['comparison'])
