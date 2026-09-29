@@ -82,18 +82,19 @@ For example, preserve the condition and order in this setup procedure:
 Claude Code:
 
 ```text
-/vale:procedural-prose Rewrite this instruction as a clear procedure. Preserve the condition and action order.
+/vale:procedural-prose Rewrite this procedure as a clear procedure: "If the backup succeeds, stop the service and install the update." Preserve the condition and action order.
 ```
 
 Codex:
 
 ```text
-$vale:procedural-prose Rewrite this instruction as a clear procedure. Preserve the condition and action order.
+$vale:procedural-prose Rewrite this procedure as a clear procedure: "If the backup succeeds, stop the service and install the update." Preserve the condition and action order.
 ```
 
 An illustrative revision is:
 
 > If the backup succeeds:
+>
 > 1. Stop the service.
 > 2. Install the update.
 
