@@ -52,6 +52,15 @@ class FindingDiffTests(unittest.TestCase):
         result = self.classify('e.g. here.\n', '', [finding(1)], [])
         self.assertEqual((result.new, result.existing, result.resolved), ([], [], [0]))
 
+    def test_missing_source_location_always_falls_back_to_actionable(self):
+        missing = Finding('guide.md', None, None, None, 'Google.Latin', 'error', 'Use for example.', 'e.g.')
+        result = self.classify('e.g. here.\n', 'e.g. here.\n', [missing], [missing])
+        self.assertEqual(result.new, [0])
+        self.assertEqual(result.existing, [])
+        self.assertEqual(result.resolved, [])
+        self.assertTrue(result.uncertain)
+        self.assertIn('source location', result.reason.lower())
+
     def test_unicode_prefix_and_repeated_columns(self):
         text = 'é e.g. and e.g.\n'
         result = self.classify(text, 'Intro.\n\n' + text,

@@ -44,11 +44,14 @@ def validate_result(result):
             raise ValueError('Invalid finding text.')
         if finding.get('severity') not in ('error', 'warning', 'suggestion'):
             raise ValueError('Invalid finding severity.')
-        for key in ('line', 'column'):
-            if type(finding.get(key)) is not int or finding[key] < 1:
-                raise ValueError('Invalid finding position.')
-        end = finding.get('end_column')
-        if end is not None and (type(end) is not int or end < finding['column']):
+        if any(key not in finding for key in ('line', 'column', 'end_column')):
+            raise ValueError('Missing finding position fields.')
+        line, column, end = (finding[key] for key in ('line', 'column', 'end_column'))
+        if line is not None and (type(line) is not int or line < 1):
+            raise ValueError('Invalid finding line.')
+        if column is not None and (line is None or type(column) is not int or column < 1):
+            raise ValueError('Invalid finding column.')
+        if end is not None and (column is None or type(end) is not int or end < column):
             raise ValueError('Invalid finding end column.')
     expected = ('incomplete' if result['errors'] else 'findings' if result['findings'] else
                 'clean' if result['submitted_files'] else 'skipped')
@@ -69,6 +72,8 @@ def command(level, message, properties):
 
 def location(finding):
     """Keep virtual, missing, symlinked, or stale locations out of file annotations."""
+    if finding['line'] is None:
+        return {}
     path = Path(finding['path'])
     root = Path.cwd().resolve()
     try:
@@ -86,7 +91,9 @@ def location(finding):
             return {}
     except (OSError, ValueError, UnicodeError):
         return {}
-    props = dict(file=relative.as_posix(), line=finding['line'], col=finding['column'])
+    props = dict(file=relative.as_posix(), line=finding['line'])
+    if finding['column'] is not None:
+        props['col'] = finding['column']
     if finding.get('end_column') is not None:
         props['endColumn'] = finding['end_column']
     return props

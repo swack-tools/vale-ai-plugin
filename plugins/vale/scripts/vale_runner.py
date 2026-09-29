@@ -79,9 +79,13 @@ def decode_alert(alert, path):
             raise ValueError(f'Vale alert has an invalid {key}.')
     span = alert.get('Span')
     line = alert.get('Line')
-    if (type(line) is not int or line < 1 or not isinstance(span, list) or len(span) != 2 or
-            any(type(x) is not int or x < 1 for x in span) or span[1] < span[0]):
+    if line is not None and (type(line) is not int or line < 1):
         raise ValueError('Vale returned an invalid source location.')
+    if span is not None:
+        if (not isinstance(span, list) or len(span) != 2 or
+                any(type(x) is not int or x < 1 for x in span) or span[1] < span[0] or line is None):
+            raise ValueError('Vale returned an invalid source location.')
+    start_column, end_column = span if span is not None else (None, None)
     suggestions = alert.get('Suggestions') or []
     action = alert.get('Action') or None
     link = alert.get('Link') or None
@@ -89,7 +93,7 @@ def decode_alert(alert, path):
             (action is not None and not isinstance(action, dict)) or
             (link is not None and not isinstance(link, str))):
         raise ValueError('Vale returned malformed suggestion metadata.')
-    return Finding(path, line, span[0], span[1], alert['Check'],
+    return Finding(path, line, start_column, end_column, alert['Check'],
                    alert['Severity'], alert['Message'], alert['Match'], link, suggestions, action)
 
 

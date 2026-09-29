@@ -41,6 +41,10 @@ def identity(finding, line):
 
 def classify_findings(before_text, after_text, before, after):
     """Return after indexes for new/existing and before indexes for resolved."""
+    all_findings = [*before, *after]
+    if any(f.line is None or f.column is None or f.end_column is None for f in all_findings):
+        return DiffResult(list(range(len(after))), [], [], True,
+                          'A finding is missing source location details.')
     old, new = before_text.splitlines(), after_text.splitlines()
     if max(len(old), len(new)) > 5000 or len(old) * len(new) > 1_000_000:
         return DiffResult(list(range(len(after))), [], [], True, 'Alignment budget exceeded.')
