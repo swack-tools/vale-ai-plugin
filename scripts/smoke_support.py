@@ -99,8 +99,7 @@ def assert_lifecycle(trace, requests, unresolved, stdout, *, host="codex"):
     assert host in ('codex', 'claude'), 'Unknown native client'
     assert all(type(record.get('exit_code')) is int and record['exit_code'] == 0 for record in trace), 'Native hook invocation failed or lacks an exit code'
     events = [record['input'].get('hook_event_name') for record in trace]
-    assert 'PreToolUse' in events, 'Native client did not run PreToolUse'
-    assert 'PostToolUse' in events, 'Native client did not run PostToolUse'
+    assert events == ['PreToolUse', 'PostToolUse', 'Stop'] * 2, 'Expected ordered Pre/Post/Stop events for both initial and correction writes'
     stops = [record for record in trace if record['input'].get('hook_event_name') == 'Stop']
     assert len(stops) == 2, 'Expected one initial Stop and one correction Stop'
     assert sum(record['output'].get('decision') == 'block' for record in stops) == 1, 'Expected exactly one blocking Stop'

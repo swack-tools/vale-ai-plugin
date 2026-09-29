@@ -260,8 +260,8 @@ The native matrix runs each of these cases on Linux and macOS:
 | Claude user plugin | Full-file | Checking skill |
 | Claude project plugin | New findings | Procedural skill |
 
-Each case requires successful Pre, Post, and Stop calls, one blocking Stop, and four
-requests to the local model fixture. The fixture first writes bad prose, then
+Each case requires successful Pre, Post, and Stop calls in order for both writes,
+one blocking Stop, and four requests to the local model fixture. The fixture first writes bad prose, then
 attempts one correction. A second case deliberately leaves the findings intact.
 Plugin cases also change the disposable package version and skill text, update
 it, and require the new text in model context. Codex refreshes a local package

@@ -96,6 +96,8 @@ class SmokeIsolationTests(unittest.TestCase):
                  {'input': {'hook_event_name': 'PostToolUse'}, 'output': {'hookSpecificOutput': {'additionalContext': 'Google.Latin'}}},
                  {'input': {'hook_event_name': 'Stop'}, 'output': {'decision': 'block', 'reason': 'Google.Latin'}},
                  {'input': {'hook_event_name': 'Stop', 'stop_hook_active': True}, 'output': {'systemMessage': 'Vale already requested a correction pass'}}]
+        trace[3:3] = [{'input': {'hook_event_name': 'PreToolUse'}, 'output': {}},
+                      {'input': {'hook_event_name': 'PostToolUse'}, 'output': {}}]
         requests = [{}, {'text': 'Google.Latin'}, {'text': 'Google.Latin Stop: Google.Latin'}, {}]
         for record in trace:
             record['exit_code'] = 0
@@ -122,7 +124,13 @@ class SmokeIsolationTests(unittest.TestCase):
             {'input': {'hook_event_name': 'Stop', 'stop_hook_active': True},
              'output': {'systemMessage': marker}, 'exit_code': 0},
         ]
+        trace[3:3] = [{'input': {'hook_event_name': 'PreToolUse'}, 'output': {}, 'exit_code': 0},
+                      {'input': {'hook_event_name': 'PostToolUse'}, 'output': {}, 'exit_code': 0}]
         requests = [{}, {'text': 'Google.Latin'}, {'text': 'Google.Latin Google.Latin'}, {}]
+        for broken in (trace[:3] + trace[4:], trace[:4] + trace[5:],
+                       trace[:3] + [trace[4], trace[3]] + trace[5:]):
+            with self.subTest(events=[r['input']['hook_event_name'] for r in broken]), self.assertRaises(AssertionError):
+                assert_lifecycle(broken, requests, True, '')
         for index in range(len(trace)):
             broken = deepcopy(trace)
             broken[index]['exit_code'] = 1
