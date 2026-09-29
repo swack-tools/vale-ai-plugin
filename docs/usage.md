@@ -197,8 +197,11 @@ Doctor reports the selected executable and version, configuration, workspace,
 parser requirements, and visible project installation files. It doesn't
 install dependencies, download rules, or edit settings. Missing optional parsers
 produce format-specific warnings. An unusable engine or configuration returns
-exit code `2`. Configuration files alone can't prove that a running client
-loaded the hook. Inspect the client's hook settings for activation.
+exit code `2`. The complete doctor operation has a 20-second time budget. This
+budget includes workspace discovery. Each Vale probe has a five-second cap. A
+timeout returns incomplete diagnostics. Configuration files alone can't prove
+that a running client loaded the hook. Inspect the client's hook settings for
+activation.
 
 ## Project policy
 

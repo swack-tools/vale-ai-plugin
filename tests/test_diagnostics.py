@@ -1,11 +1,14 @@
 """Doctor inspects capabilities without changing the project or client settings."""
+import io
 import json
 import os
 from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
+from unittest.mock import patch
 
 HOOK = Path(__file__).resolve().parents[1] / 'plugins/vale/scripts/prose_lint.py'
 
@@ -66,3 +69,125 @@ class DoctorTests(unittest.TestCase):
         self.assertEqual(result['installation']['activation'], 'unknown')
         self.assertEqual(result['coverage']['verification'], 'configured_invocation')
         self.assertIn('config_path', result['config'])
+
+    def run_with_deadline(self, *, fake_git=None, fake_vale=None, seconds=0.08):
+        scripts = self.root / 'bin'
+        scripts.mkdir(exist_ok=True)
+        if fake_git:
+            command = scripts / 'git'
+            command.write_text('#!' + sys.executable + '\n' + fake_git)
+            command.chmod(0o755)
+        if fake_vale:
+            command = scripts / 'vale'
+            command.write_text('#!' + sys.executable + '\n' + fake_vale)
+            command.chmod(0o755)
+        self.env['PATH'] = str(scripts) + os.pathsep + os.defpath
+        import importlib
+        sys.path.insert(0, str(HOOK.parent))
+        self.addCleanup(lambda: sys.path.remove(str(HOOK.parent)))
+        prose_lint = importlib.import_module('prose_lint')
+        from deadline import Deadline
+        with patch.object(prose_lint, 'Deadline', lambda _seconds: Deadline(seconds)), \
+             patch.dict(os.environ, {'PATH': self.env['PATH']}), \
+             patch.object(sys, 'argv', [str(HOOK), '--doctor', '--format', 'json']), \
+             patch('pathlib.Path.cwd', return_value=self.root), \
+             patch('sys.stdout', new_callable=io.StringIO) as output:
+            code = prose_lint.main()
+        return code, json.loads(output.getvalue())
+
+    def test_doctor_deadline_includes_workspace_discovery(self):
+        started = time.monotonic()
+        code, result = self.run_with_deadline(fake_git='import time\ntime.sleep(2)\n')
+        self.assertLess(time.monotonic() - started, 1.0)
+        self.assertEqual(code, 2)
+        self.assertEqual(result['overall_status'], 'incomplete')
+        self.assertTrue(any('deadline' in error.lower() or 'timed out' in error.lower()
+                            for error in result['errors']))
+        self.assertEqual(list(self.root.iterdir()), [self.root / 'bin'])
+
+    def test_doctor_probe_uses_shared_deadline(self):
+        code, result = self.run_with_deadline(
+            fake_vale='import sys, time\n'
+                      "time.sleep(2) if '--version' in sys.argv else print('{}')\n")
+        self.assertEqual(code, 2)
+        self.assertEqual(result['overall_status'], 'incomplete')
+        self.assertTrue(result['errors'])
+        self.assertFalse((self.root / '.codex').exists())
+
+    def test_doctor_second_probe_uses_remaining_shared_deadline(self):
+        started = time.monotonic()
+        code, result = self.run_with_deadline(
+            fake_vale='import sys, time\n'
+                      "if '--version' in sys.argv:\n"
+                      "    time.sleep(.05)\n"
+                      "    print('vale version 3.23.0')\n"
+                      'else:\n'
+                      '    time.sleep(2)\n')
+        self.assertLess(time.monotonic() - started, 1.0)
+        self.assertEqual(code, 2)
+        self.assertEqual(result['overall_status'], 'incomplete')
+        self.assertTrue(result['errors'])
+
+    def test_doctor_probe_output_is_bounded(self):
+        code, result = self.run_with_deadline(
+            fake_vale='import sys\n'
+                      "if '--version' in sys.argv:\n"
+                      "    print('x' * 2_000_000)\n", seconds=2)
+        self.assertEqual(code, 2)
+        self.assertEqual(result['overall_status'], 'incomplete')
+        self.assertTrue(any('output exceeded' in error for error in result['errors']))
+
+    def test_doctor_timeout_stops_probe_descendants(self):
+        marker = self.root / 'late-child-write'
+        child = "import time; time.sleep(.3); open(" + repr(str(marker)) + ", 'w').write('late')"
+        body = ('import subprocess, sys, time\n'
+                "if '--version' in sys.argv:\n"
+                f'    subprocess.Popen([sys.executable, "-c", {child!r}])\n'
+                '    time.sleep(2)\n')
+        code, result = self.run_with_deadline(fake_vale=body)
+        self.assertEqual(code, 2)
+        self.assertEqual(result['overall_status'], 'incomplete')
+        time.sleep(.4)
+        self.assertFalse(marker.exists())
+
+    def test_deadline_expiring_during_config_decode_cannot_report_ready(self):
+        scripts = self.root / 'bin'
+        scripts.mkdir(exist_ok=True)
+        command = scripts / 'vale'
+        command.write_text('#!' + sys.executable + '\n'
+                           "import sys\n"
+                           "print('vale version 3.23.0' if '--version' in sys.argv else '{}')\n")
+        command.chmod(0o755)
+        import importlib
+        sys.path.insert(0, str(HOOK.parent))
+        self.addCleanup(lambda: sys.path.remove(str(HOOK.parent)))
+        prose_lint = importlib.import_module('prose_lint')
+        diagnostics = importlib.import_module('diagnostics')
+        from deadline import Deadline
+
+        class Clock:
+            now = 0
+
+            def __call__(self):
+                return self.now
+
+        clock = Clock()
+        original_loads = json.loads
+
+        def expire_after_decode(content):
+            value = original_loads(content)
+            clock.now = 21
+            return value
+
+        with patch.object(prose_lint, 'Deadline', lambda seconds: Deadline(seconds, clock=clock)), \
+             patch.dict(os.environ, {'PATH': str(scripts) + os.pathsep + os.defpath}), \
+             patch.object(sys, 'argv', [str(HOOK), '--doctor', '--format', 'json']), \
+             patch('pathlib.Path.cwd', return_value=self.root), \
+             patch.object(diagnostics.json, 'loads', side_effect=expire_after_decode), \
+             patch('sys.stdout', new_callable=io.StringIO) as output:
+            code = prose_lint.main()
+        result = json.loads(output.getvalue())
+        self.assertEqual(code, 2)
+        self.assertEqual(result['overall_status'], 'incomplete')
+        self.assertNotEqual(result['config']['status'], 'loaded')
+        self.assertTrue(any('deadline' in error.lower() for error in result['errors']))

@@ -14,7 +14,7 @@ import sys
 import tempfile
 import time
 
-from deadline import Deadline, OutputLimitExceeded, run_process
+from deadline import Deadline, DeadlineExceeded, OutputLimitExceeded, run_process
 
 from lint_result import Issue, render_text
 import vale_runner
@@ -383,10 +383,11 @@ def main():
     if args.scope == 'new-findings' and (args.all or (args.check and args.base_ref is None)):
         parser.error('Manual new-findings requires --check FILE... --base-ref REV; --all does not compare.')
     if args.check or args.all or args.doctor or args.stdin:
+        deadline = Deadline(20) if args.doctor else None
         root = Path.cwd()
         try:
-            root = workspace(root.resolve())
-        except (OSError, ValueError, RuntimeError, subprocess.TimeoutExpired) as exc:
+            root = workspace(root.resolve(), deadline=deadline)
+        except (OSError, ValueError, RuntimeError, subprocess.TimeoutExpired, DeadlineExceeded) as exc:
             note = 'Workspace discovery failed: ' + str(exc)
             if args.doctor:
                 from diagnostics import empty_diagnostics, render_diagnostics
@@ -408,7 +409,7 @@ def main():
             return 2
         if args.doctor:
             from diagnostics import inspect_environment, render_diagnostics
-            report = inspect_environment(root, cli_overrides=overrides)
+            report = inspect_environment(root, cli_overrides=overrides, deadline=deadline)
             print(json.dumps(report) if args.format == 'json' else render_diagnostics(report))
             return 2 if report['overall_status'] == 'incomplete' else 0
         names = []
