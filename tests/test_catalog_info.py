@@ -115,6 +115,24 @@ class CatalogInfoTests(unittest.TestCase):
         source.pop("heading_path")
         self.assertFalse(any("source path missing" in error for error in checker.validate(ROOT, data)))
 
+    def test_optional_source_cannot_resolve_outside_repository(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "repo"
+            docs = root / "docs"
+            docs.mkdir(parents=True)
+            outside = Path(temporary) / "outside.md"
+            outside.write_text("outside\n")
+            (docs / "linked.md").symlink_to(outside)
+            errors = []
+            valid = checker._validate_source(root, {
+                "path": "docs/linked.md",
+                "format": "markdown",
+                "mode": "lead",
+                "required": False,
+            }, errors)
+        self.assertFalse(valid)
+        self.assertTrue(any("outside repository" in error for error in errors))
+
     def test_invented_capability_is_rejected(self):
         data = json.loads((ROOT / "catalog-info.json").read_text())
         data["examples"][0]["capability_refs"] = ["mcp_tool:invented_tool"]
