@@ -20,6 +20,10 @@ jobs:
           ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: false
+      - name: Install catalog validator dependencies
+        run: python -m pip install -r requirements-catalog.txt
+      - name: Validate catalog metadata
+        run: python scripts/check_catalog_info.py
       - name: Require tagged commit to be on main
         run: |
           git fetch --no-tags origin main
