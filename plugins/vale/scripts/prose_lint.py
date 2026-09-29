@@ -8,7 +8,7 @@ import fcntl
 import hashlib
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 import subprocess
 import sys
 import tempfile
@@ -304,12 +304,63 @@ def scoped_check(root, names, *, deadline, scope='changed-files', directory=None
     result = run_check(root, names, deadline=deadline, documents=documents if identity is not None else None, policy=policy)
     return baseline.compare(root, result, documents, identity, directory=directory, revision=revision, deadline=deadline, wrapper_policy=policy)
 
+class ArgumentParser(argparse.ArgumentParser):
+    def error(self, message):
+        # Draft argument failures use the same machine-readable contract as input failures.
+        raw = sys.argv[1:]
+        if '--stdin' in raw:
+            result = empty_result(Path.cwd())
+            result.errors.append(Issue('argument_error', message))
+            result.finish()
+            as_json = '--format=json' in raw or any(
+                a == '--format' and b == 'json' for a, b in zip(raw, raw[1:]))
+            print(result.to_json() if as_json else render_text(result))
+            raise SystemExit(2)
+        super().error(message)
+
+
+def check_stdin(root, args, policy, deadline):
+    """Check bounded UTF-8 prose; the logical identity is never a file operand."""
+    name = args.path if args.path is not None else 'draft.' + args.ext
+    identity = '<stdin:' + name + '>'
+    result = empty_result(root, [identity], policy)
+    path = PurePosixPath(name)
+    if (not name or path.is_absolute() or PureWindowsPath(name).drive or
+            '\\' in name or '..' in path.parts or path.suffix != '.' + args.ext or
+            any(ord(c) < 32 for c in name)):
+        result.errors.append(Issue('input_path', 'Use a root-relative logical path with the declared extension and no parent traversal.', identity))
+        return result.finish()
+    try:
+        raw = sys.stdin.buffer.read(MAX_BYTES + 1)
+        if len(raw) > MAX_BYTES:
+            result.errors.append(Issue('input_limit', 'Draft exceeds the 1 MiB byte limit.', identity))
+            return result.finish()
+        try:
+            text = raw.decode('utf-8', errors='strict')
+        except UnicodeDecodeError:
+            result.errors.append(Issue('input_encoding', 'Draft must be valid UTF-8.', identity))
+            return result.finish()
+        result = vale_runner.check_document(root, text, name, deadline=deadline, policy=policy)
+    except (OSError, ValueError, RuntimeError, subprocess.TimeoutExpired) as exc:
+        result.errors.append(Issue('check_error', str(exc), identity))
+        result.finish()
+    result.requested_files = [identity]
+    result.submitted_files = [identity for _ in result.submitted_files]
+    for item in [*result.findings, *result.skipped_files, *result.errors]:
+        if item.path is not None:
+            item.path = identity
+    return result
+
+
 def main():
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = ArgumentParser(description=__doc__)
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument('--check', nargs='+', metavar='FILE', help='Check named files without a hook event.')
     mode.add_argument('--all', action='store_true', help='Check all eligible workspace files.')
     mode.add_argument('--doctor', action='store_true', help='Inspect the engine, configuration, and parser readiness.')
+    mode.add_argument('--stdin', action='store_true', help='Check UTF-8 draft prose from standard input.')
+    parser.add_argument('--ext', choices=('md', 'txt', 'rst', 'adoc', 'html'))
+    parser.add_argument('--path', help='Root-relative logical draft path; never read or written.')
     parser.add_argument('--format', choices=('text', 'json'), default='text')
     parser.add_argument('--scope', choices=('changed-files', 'new-findings'))
     parser.add_argument('--base-ref', help='Git commit or ref for manual new-findings checks.')
@@ -320,12 +371,18 @@ def main():
                               help=f'Override the project {name} list with an empty list.')
     parser.add_argument('--profile', choices=selection_policy.PROFILES)
     args = parser.parse_args()
+    if args.stdin and not args.ext:
+        parser.error('--stdin requires --ext.')
+    if not args.stdin and (args.ext is not None or args.path is not None):
+        parser.error('--ext and --path require --stdin.')
+    if args.stdin and args.scope == 'new-findings':
+        parser.error('--stdin checks the complete draft and cannot compare new findings.')
     overrides = {key: getattr(args, key) for key in ('scope', 'include', 'exclude', 'profile')}
     if args.base_ref is not None and (not args.check or args.scope == 'changed-files'):
         parser.error('--base-ref requires --check and --scope new-findings.')
     if args.scope == 'new-findings' and (args.all or (args.check and args.base_ref is None)):
         parser.error('Manual new-findings requires --check FILE... --base-ref REV; --all does not compare.')
-    if args.check or args.all or args.doctor:
+    if args.check or args.all or args.doctor or args.stdin:
         root = Path.cwd()
         try:
             root = workspace(root.resolve())
@@ -362,6 +419,10 @@ def main():
         policy = None
         try:
             policy = selection_policy.load_policy(root, overrides)
+            if args.stdin:
+                result = check_stdin(root, args, policy, deadline)
+                print(result.to_json() if args.format == 'json' else render_text(result))
+                return result.exit_code
             scope = 'changed-files' if args.all else policy.scope
             if args.base_ref and scope != 'new-findings':
                 raise ValueError('--base-ref requires --scope new-findings or the same project scope.')
