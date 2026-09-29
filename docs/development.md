@@ -21,14 +21,16 @@ docs/                 Documentation source and static assets
 ```
 
 The runtime uses only the Python standard library and the installed Vale
-executable. The documentation build uses the pinned dependency in
-`requirements-docs.txt`. Package validation and its tests use PyYAML from
-`requirements-dev.txt`. Installed hooks need neither dependency.
+executable. The development requirements include the catalog validator,
+package validator, and their tests. The documentation build uses the pinned
+dependency in `requirements-docs.txt`. Installed hooks need none of these
+development dependencies.
 
 ## Run the checks
 
 ```sh
 python3 -m pip install -r requirements-dev.txt
+python3 scripts/check_catalog_info.py
 python3 scripts/validate_plugin.py
 python3 -m unittest discover -s tests -v
 python3 scripts/check_docs.py
