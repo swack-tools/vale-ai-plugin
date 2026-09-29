@@ -133,9 +133,9 @@ selection roots, local reproduction, limits, and reuse in another repository.
 
 The source checkout includes twelve labeled prose fixtures and an offline
 validator for paired writing trials. It checks protected literals and requires
-explicit semantic reviews. The real-model pilot remains unrun. See the
-[writing evaluation guide](https://vale.swacktech.com/evaluation.html) for
-reproducible inputs, review criteria, and evidence limits.
+explicit semantic reviews. The real-model pilots remain unrun. The evaluation
+[guide](https://vale.swacktech.com/evaluation.html) explains the canary-first
+process, shared-auth limitations, review criteria, and evidence requirements.
 
 ## Diagnostics
 

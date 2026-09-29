@@ -93,6 +93,32 @@ Complete this preflight for every arm:
 6. Send the saved prompt without changing it. Save the returned document exactly,
    then record the actual session metadata. Keep any extra run logs private.
 
+Before running a full suite, use its first case as a canary. Run one baseline and
+one skill trial with the exact settings planned for the suite. Confirm that both
+calls return output and that the client loaded the target skill for the treatment
+arm. Keep successful canary outputs as the first pair. If a call fails because
+authorization, usage limits, or skill loading is unavailable, stop the suite and
+record it as unrun. Don't count a failed call as a trial.
+
+### Use a shared Codex authentication profile
+
+A separate test host can use a signed-in Codex profile only for authentication
+while each trial uses a new `HOME`, workspace, and ephemeral session. Keep
+`CODEX_HOME` pointed at the authorized profile. Set `HOME`, `XDG_CONFIG_HOME`,
+and `XDG_CACHE_HOME` to fresh temporary directories for each run. Invoke Codex
+with `--ignore-user-config` and `--ephemeral`, and use the same model and settings
+for every arm in a suite. Put only the selected writing skill in the treatment
+workspace's `.agents/skills/` directory. Leave it out of the baseline workspace.
+
+This setup shares the Codex authentication profile. It doesn't meet the original
+requirement for a distinct authenticated `CODEX_HOME` per run. Record the shared
+profile with a non-sensitive label in `settings`, set `preflight.isolated_home`
+to `false`, and report the results as exploratory. Don't copy credentials into
+trial evidence. `--ignore-user-config` skips the Codex user configuration file,
+but it doesn't prove that other user skills, plugins, or hooks are absent.
+Verify the actual context before continuing. If you can't
+verify that only the target skill reaches the treatment arm, stop the trial.
+
 These checks are operator attestations. The validator checks their structure
 and consistency. It can't prove session isolation or that a
 recorded model produced a file. Retain enough private run evidence for review.
@@ -224,8 +250,12 @@ with Vale 3.23.0. Validator regressions demonstrate that changed commands,
 incomplete pairs, contaminated baselines, mismatched models, stale output
 reviews, and missing review dimensions can't pass.
 
-Both real-model pilots remain unrun. The current isolated client environments
-have no authorized model session. A normal signed-in client doesn't establish
-an uncontaminated paired experiment. Editorial improvement and semantic
-preservation by the writing skill remain unverified. The harness is ready for
-six Google pairs or seven procedural pairs when isolated authorized model access is available. The procedural skill remains experimental. Its [profile guide](profiles.html) explains the workflow and limitations.
+Both real-model pilots remain unrun. On 2026-09-29, the Codex command-line tool
+0.159.0 on a separate test host passed login status but returned an account
+usage-limit error before either canary produced output. The shared authentication
+profile didn't establish a fresh `CODEX_HOME`, and the canaries didn't verify
+skill loading. No trial outputs or semantic reviews exist. Editorial improvement and
+semantic preservation by the writing skill remain unverified. The harness is
+ready for six Google pairs or seven procedural pairs when authorized model
+access is available. The procedural skill remains experimental. Its
+[profile guide](profiles.html) explains the workflow and limitations.
