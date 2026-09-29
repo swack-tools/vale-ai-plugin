@@ -27,6 +27,7 @@ usage and limits so the feature's value stays testable.
 | [Bounded execution and state](behavior.html#performance-and-state-lifecycle) | Keep hooks responsive and preserve unfinished checks | Tests cover deadlines, output caps, locks, process cleanup, and retries. Initial text capture occurs only in opt-in comparison mode. |
 | [Native smoke tests and benchmarks](development.html) | Detect client integration regressions and measure hook cost | Disposable workspaces and local model fixtures avoid real model accounts. CI runs pinned clients on Linux and macOS across four installation paths. It records corrected, unresolved, and local update cases. Scripted replies don't evaluate editorial judgment. |
 | [Package validation](development.html#package-validation) | Catch missing resources and incompatible package metadata before installation | Host-specific checks retain unknown optional fields for native validation. This isn't a complete upstream schema or secret scanner. |
+| [Pull request annotations](ci.html) | Review changed documents without a local agent | Shared policy, whole-file findings, escaped locations, and retained JSON. No automatic edits or write token. |
 | [Documentation deployment](development.html#deployment-policy) | Publish tested guidance at the custom domain | Pull requests check code and strict Google style. Only pushes to `main` can deploy. |
 
 ## Keep the surface small
