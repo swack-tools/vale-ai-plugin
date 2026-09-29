@@ -69,8 +69,38 @@ $vale:google-prose Rewrite the installation section for a first-time contributor
 ```
 
 The writing skill applies Google documentation style and verifies the result
-with the same checker. Clients can also select either skill automatically for relevant
-natural-language requests, such as “check these docs with Vale.”
+with the same checker. Clients can select a skill automatically when a request
+matches its purpose, such as “check these docs with Vale.”
+
+## Revise a procedure
+
+Use the experimental procedural skill to revise a runbook or setup instruction.
+For example, preserve the condition and order in this setup procedure:
+
+> If the backup succeeds, stop the service and install the update.
+
+Claude Code:
+
+```text
+/vale:procedural-prose Rewrite this instruction as a clear procedure. Preserve the condition and action order.
+```
+
+Codex:
+
+```text
+$vale:procedural-prose Rewrite this instruction as a clear procedure. Preserve the condition and action order.
+```
+
+An illustrative revision is:
+
+> If the backup succeeds:
+> 1. Stop the service.
+> 2. Install the update.
+
+This example shows one possible structure. It isn't an evaluated model result.
+The experimental skill offers editorial guidance, not certification against a
+formal Simplified Technical English standard. See the [profile guide](profiles.html)
+for its limits and evaluation status.
 
 ## Check an unsaved draft
 

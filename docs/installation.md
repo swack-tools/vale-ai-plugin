@@ -74,9 +74,9 @@ claude plugin install vale@vale --scope project
 ```
 
 Review the resulting `.claude/settings.json` before committing it. Restart
-Claude Code and inspect `/hooks`. The plugin provides three hooks and two skills:
-`/vale:check-prose` and `/vale:google-prose`. Skills also support automatic
-selection when your request matches their purpose.
+Claude Code and inspect `/hooks`. The plugin exposes the
+`/vale:check-prose`, `/vale:google-prose`, and `/vale:procedural-prose` skills.
+Skills also support automatic selection when your request matches their purpose.
 
 ## Codex plugin
 

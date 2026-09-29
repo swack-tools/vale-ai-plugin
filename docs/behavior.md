@@ -23,6 +23,20 @@ post-tool context and `decision: block` for a Stop continuation. If the client s
 continuation. This bounds automatic correction to one Stop retry. It isn't an
 unconditional completion gate.
 
+### Concrete hook examples
+
+These examples describe the registered actions. They aren't recorded test runs.
+
+| Event | Trigger | Expected outcome |
+| --- | --- | --- |
+| `PreToolUse` | The agent makes its first tool call after a new session starts. | Vale records the workspace file-state baseline and returns empty JSON on success. It doesn't lint unchanged files at this step. |
+| `PostToolUse` | After the baseline exists, a tool changes `docs/setup.md`. Vale observes the changed file state, and the new content has a configured finding. | Vale checks the changed eligible file and adds findings to model context. The original tool result and exit status remain intact. |
+| `Stop` | The agent is ready to finish while `docs/setup.md` still has findings from the session. | Vale checks touched files and can request one correction pass. On the retry, it reports remaining findings without requesting another continuation. |
+
+The checker reports findings and doesn't edit files. A read-only tool call
+doesn't lint unchanged prose unless a previous incomplete check left files
+pending. See [file selection](#file-selection) for baseline and retry details.
+
 ## File selection
 
 The checker uses Git to list tracked and untracked files in a repository. The checker
