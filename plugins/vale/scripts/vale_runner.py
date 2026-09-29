@@ -145,7 +145,7 @@ def check_document(root, text, logical_path, *, deadline=None, policy=None, rela
     path = root / name
     if (not path.is_absolute() or not path.is_relative_to(root) or '..' in path.parts or
             not policy.supports(name) or
-            path.is_symlink() or any(p.is_symlink() for p in path.parents)):
+            (not relative_identity and (path.is_symlink() or any(p.is_symlink() for p in path.parents)))):
         result.errors.append(Issue('unsupported_path', 'Invalid logical document path.', name))
     elif not policy.selected(name):
         result.skipped_files.append(Issue('excluded_path', 'File is excluded by the wrapper policy.', name))

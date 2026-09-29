@@ -217,3 +217,22 @@ class StdinTests(unittest.TestCase):
                     self.assertEqual(result['config_path'], str(self.root / '.vale.ini'))
                     self.assertEqual(result['findings'][0]['path'], '<stdin:docs/setup.md>')
                     self.assertFalse((self.root / 'docs').exists())
+
+    def test_synthetic_target_does_not_inspect_symlinks(self):
+        with tempfile.TemporaryDirectory(prefix='vale unrelated target ') as outside:
+            target = Path(outside) / 'setup.md'
+            target.write_text('This target must not be read or changed.\n')
+            (self.root / 'docs').symlink_to(Path(outside), target_is_directory=True)
+            code, result = self.cli(b'Use this, e.g. for testing.\n', '--ext', 'md', '--path', 'docs/setup.md')
+            self.assertEqual(code, 1, result)
+            self.assertEqual(result['findings'][0]['rule'], 'Google.Latin')
+            self.assertEqual(result['findings'][0]['path'], '<stdin:docs/setup.md>')
+            self.assertEqual(target.read_text(), 'This target must not be read or changed.\n')
+            (self.root / 'docs').unlink()
+            (self.root / 'draft.md').symlink_to(target)
+            code, result = self.cli(b'Use this, e.g. for testing.\n', '--ext', 'md')
+            self.assertEqual(code, 1, result)
+            # Saved-file checks must retain their existing symlink rejection.
+            file_code, saved = self.file_check('draft.md')
+            self.assertEqual(file_code, 2)
+            self.assertEqual(saved['status'], 'incomplete')

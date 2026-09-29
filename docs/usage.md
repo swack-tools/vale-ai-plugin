@@ -107,7 +107,8 @@ configuration and wrapper selection still come from that workspace.
 
 `--path` is a synthetic root-relative identity, with `draft.<ext>` as its default.
 It must have the declared extension and can't be absolute or contain parent
-traversal. The checker doesn't read or write that target. Use
+traversal. The checker doesn't read, write, or inspect that target's filesystem
+entries. Existing symlinks don't affect this synthetic identity. Use
 `--path=-draft.md` for a leading hyphen. Results use `<stdin:docs/setup.md>` so
 editors don't confuse the virtual location with an existing file. Source lines
 and columns come from the original draft. Markdown code exclusions stay intact.
