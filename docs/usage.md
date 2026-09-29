@@ -176,7 +176,10 @@ suggestion metadata. Vale can omit a line or span. The JSON result uses `null`
 for unavailable coordinates. These findings remain actionable and are never
 suppressed by change comparison. Text output uses `?` for an unavailable
 coordinate. CI annotations include only source positions the checker received.
-The checker doesn't apply suggestions.
+The checker doesn't apply suggestions. In tested Markdown and Python-comment files, Vale 3.23
+reports columns as 1-based Unicode code-point positions with inclusive span ends. Columns
+include Markdown emphasis markers and Python comment markers. Combining marks each count
+as a code point.
 
 `submitted_files` records completed engine invocations. It doesn't prove that
 every file matched a rule. An empty Vale result can mean either no findings or
