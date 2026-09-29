@@ -149,3 +149,45 @@ class DoctorTests(unittest.TestCase):
         self.assertEqual(result['overall_status'], 'incomplete')
         time.sleep(.4)
         self.assertFalse(marker.exists())
+
+    def test_deadline_expiring_during_config_decode_cannot_report_ready(self):
+        scripts = self.root / 'bin'
+        scripts.mkdir(exist_ok=True)
+        command = scripts / 'vale'
+        command.write_text('#!' + sys.executable + '\n'
+                           "import sys\n"
+                           "print('vale version 3.23.0' if '--version' in sys.argv else '{}')\n")
+        command.chmod(0o755)
+        import importlib
+        sys.path.insert(0, str(HOOK.parent))
+        self.addCleanup(lambda: sys.path.remove(str(HOOK.parent)))
+        prose_lint = importlib.import_module('prose_lint')
+        diagnostics = importlib.import_module('diagnostics')
+        from deadline import Deadline
+
+        class Clock:
+            now = 0
+
+            def __call__(self):
+                return self.now
+
+        clock = Clock()
+        original_loads = json.loads
+
+        def expire_after_decode(content):
+            value = original_loads(content)
+            clock.now = 21
+            return value
+
+        with patch.object(prose_lint, 'Deadline', lambda seconds: Deadline(seconds, clock=clock)), \
+             patch.dict(os.environ, {'PATH': str(scripts) + os.pathsep + os.defpath}), \
+             patch.object(sys, 'argv', [str(HOOK), '--doctor', '--format', 'json']), \
+             patch('pathlib.Path.cwd', return_value=self.root), \
+             patch.object(diagnostics.json, 'loads', side_effect=expire_after_decode), \
+             patch('sys.stdout', new_callable=io.StringIO) as output:
+            code = prose_lint.main()
+        result = json.loads(output.getvalue())
+        self.assertEqual(code, 2)
+        self.assertEqual(result['overall_status'], 'incomplete')
+        self.assertNotEqual(result['config']['status'], 'loaded')
+        self.assertTrue(any('deadline' in error.lower() for error in result['errors']))

@@ -76,6 +76,7 @@ def inspect_environment(root, *, cli_overrides=None, deadline=None):
         parsed = json.loads(config.stdout)
         if not isinstance(parsed, dict):
             raise ValueError('Vale returned an invalid configuration description.')
+        deadline.check()
         report['config']['status'] = 'loaded'
     except (OSError, ValueError, RuntimeError, DeadlineExceeded, subprocess.TimeoutExpired) as exc:
         report['overall_status'] = 'incomplete'
