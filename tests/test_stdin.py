@@ -196,3 +196,24 @@ class StdinTests(unittest.TestCase):
         self.assertEqual(draft['status'], saved['status'])
         self.assertEqual([(f['rule'], f['line'], f['column'], f['end_column']) for f in draft['findings']],
                          [(f['rule'], f['line'], f['column'], f['end_column']) for f in saved['findings']])
+
+    def test_installed_draft_check_uses_project_config_for_both_hosts(self):
+        self.project_config()
+        for host in ('codex', 'claude'):
+            for location in ('project', 'user'):
+                with self.subTest(host=host, location=location), tempfile.TemporaryDirectory(prefix='vale draft home ') as home:
+                    env = os.environ.copy()
+                    env.update(HOME=home, CODEX_HOME=home + '/.codex', CLAUDE_CONFIG_DIR=home + '/.claude', PYTHONDONTWRITEBYTECODE='1')
+                    scope = ['--project', str(self.root)] if location == 'project' else ['--user']
+                    install = subprocess.run([sys.executable, str(ROOT / 'scripts/install.py'), '--host', host, *scope],
+                                             env=env, capture_output=True, timeout=30)
+                    self.assertEqual(install.returncode, 0, install.stderr)
+                    config = (self.root if location == 'project' else Path(home)) / ('.' + host)
+                    checker = config / 'vale/scripts/prose_lint.py'
+                    checked = subprocess.run([sys.executable, str(checker), '--stdin', '--ext', 'md', '--path', 'docs/setup.md', '--format', 'json'],
+                                             input=b'Use this, e.g. for testing.', cwd=self.root, env=env, capture_output=True, timeout=30)
+                    self.assertEqual(checked.returncode, 1, checked.stderr + checked.stdout)
+                    result = json.loads(checked.stdout)
+                    self.assertEqual(result['config_path'], str(self.root / '.vale.ini'))
+                    self.assertEqual(result['findings'][0]['path'], '<stdin:docs/setup.md>')
+                    self.assertFalse((self.root / 'docs').exists())

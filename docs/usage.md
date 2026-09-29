@@ -72,6 +72,67 @@ The writing skill applies Google documentation style and verifies the result
 with the same checker. Clients can also select either skill automatically for relevant
 natural-language requests, such as “check these docs with Vale.”
 
+## Check an unsaved draft
+
+Ask Claude Code with `/vale:check-prose`, or Codex with `$vale:check-prose`, to
+check the supplied draft for its intended path without creating a file:
+
+```text
+Check this unsaved Markdown draft for docs/setup.md. Keep the embedded command
+unchanged, fix the prose findings, and check it again without saving a file.
+```
+
+From a source checkout, send UTF-8 bytes through stdin:
+
+```sh
+python3 plugins/vale/scripts/prose_lint.py --stdin --ext md --path docs/setup.md --format json <<'VALE_DRAFT'
+Use this, e.g. for testing.
+
+Run `printf "$HOME"`.
+VALE_DRAFT
+```
+
+The quoted delimiter keeps shell syntax literal. For arbitrary supplied text,
+use structured subprocess input or choose a delimiter absent from the draft.
+The checker never executes the prose. Under the bundled rules this example has
+one `Google.Latin` finding. Change only `e.g.` to `for example`, then rerun the
+same command with the corrected draft. The finding count becomes zero and the
+embedded command stays unchanged. The checker doesn't edit a document or retain
+the draft in hook state.
+
+Supply `--ext` with one of `md`, `txt`, `rst`, `adoc`, or `html`. reStructuredText requires
+Docutils. AsciiDoc requires Asciidoctor. See [parser setup](installation.html).
+Use the absolute checker path when running from another workspace. Project
+configuration and wrapper selection still come from that workspace.
+
+`--path` is a synthetic root-relative identity, with `draft.<ext>` as its default.
+It must have the declared extension and can't be absolute or contain parent
+traversal. The checker doesn't read or write that target. Use
+`--path=-draft.md` for a leading hyphen. Results use `<stdin:docs/setup.md>` so
+editors don't confuse the virtual location with an existing file. Source lines
+and columns come from the original draft. Markdown code exclusions stay intact.
+
+For path-specific project rules, provide the intended target. The skill asks
+for it when it can't derive it. Vale 3.23 distinguishes relative stdin paths
+from the absolute operands used by file checks. In the tested configuration,
+`[**/docs/*.md]` matches both, while `[docs/*.md]` matches only the relative draft
+identity. Review your patterns deliberately. The checker doesn't rewrite them.
+Project rule coverage remains unknown even when no findings appear.
+
+The reader consumes at most 1 MiB plus one byte. More than 1 MiB or invalid UTF-8
+returns status `incomplete` and exit code `2`. An empty valid draft completes
+with zero findings. Configuration and parser failures also return `incomplete`.
+A policy exclusion returns `skipped`. Both use exit code `2`. Findings use `1`,
+and a completed check without findings uses `0`. JSON mode emits one schema-v1
+result. Input and argument failures use that result format. It retains the same coverage
+caveat as file checking.
+
+Draft mode checks all supplied prose and doesn't compare session or Git
+baselines, even when project policy selects new findings. It can't combine
+with `--check`, `--all`, `--doctor`, `--scope new-findings`, or `--base-ref`.
+There is no automatic check of assistant replies. Shell or agent transcripts can
+still retain text you submit. The checker doesn't control transcript retention.
+
 ## Check edits from other tools
 
 Ask either agent to update a document with a shell script, editor, patch, or Model Context Protocol

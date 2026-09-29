@@ -7,8 +7,9 @@ usage and limits so the feature's value stays testable.
 | Feature | When it helps | Verification and limits |
 | --- | --- | --- |
 | [Automatic lifecycle hooks](behavior.html#hook-lifecycle) | Catch local prose edits from editors, shell commands, and other tools | Shared event tests and real-client fixtures verify feedback. Remote-only edits remain outside coverage. |
-| [One Stop correction pass](behavior.html#hook-lifecycle) | Request a correction before an agent finishes | Tests keep unresolved findings visible without an endless retry loop. It isn't an unconditional completion gate. |
+| [One Stop correction pass](behavior.html#hook-lifecycle) | Request a correction before an agent finishes | Tests verify one correction pass and the documented delivery channels. Final warning visibility varies by client. It isn't an unconditional completion gate. |
 | [Full-file checks](usage.html#run-without-an-agent) | Review named files without an agent | Real Vale tests preserve paths, rule details, and operational failures. This remains the default. |
+| [Draft checks](usage.html#check-an-unsaved-draft) | Check unsaved prose without creating a document | Shared engine, bounded UTF-8 input, virtual locations, and preserved code examples. Project path patterns need deliberate selection. |
 | [Workspace audit](usage.html#choose-the-audit-scope) | Discover existing prose debt across eligible files | `--all` uses the documented exclusions and ignores session baselines. |
 | [New-findings comparison](usage.html#choose-the-audit-scope) | Focus a change on new issues in an existing document | A duplicate fixture retains the new occurrence and suppresses the old one. Conservative fallbacks reduce this benefit for custom policies and some formats. |
 | [Checking and writing skills](usage.html) | Request a review, a correction, or new documentation | Both hosts share the checker. Skills preserve technical meaning and require verification after edits. Model judgment still needs review. |

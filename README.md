@@ -54,6 +54,8 @@ installation guide for that compatibility path.
   verify it with Vale.
 - **Audit scope:** use `--all` for every eligible workspace file, or
   `--check FILE --scope new-findings --base-ref main` for conservative comparison.
+- **Unsaved drafts:** use `--stdin --ext md --path docs/setup.md --format json`
+  with quoted stdin input. See the [draft workflow](https://vale.swacktech.com/usage.html#check-an-unsaved-draft).
 - **Direct checks:** run `python3 plugins/vale/scripts/prose_lint.py --check README.md`.
 
 The checker leaves files unchanged. The agent applies requested corrections.
