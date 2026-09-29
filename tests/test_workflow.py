@@ -40,11 +40,25 @@ class WorkflowTests(unittest.TestCase):
 
     def test_deployment_requires_all_checks_and_read_only_pr_jobs(self):
         jobs = self.workflow['jobs']
-        self.assertEqual(set(jobs['deploy']['needs']), {'test', 'native', 'build'})
+        self.assertEqual(set(jobs['deploy']['needs']), {'test', 'native', 'build', 'prose'})
         self.assertEqual(self.workflow['permissions'], {'contents':'read'})
-        for name in ('test', 'native', 'build'):
+        for name in ('test', 'native', 'build', 'prose'):
             self.assertNotIn('permissions', jobs[name])
             for step in jobs[name]['steps']:
                 if 'actions/checkout@' in step.get('uses', ''):
                     self.assertEqual(step.get('with', {}).get('persist-credentials'), 'false')
         self.assertEqual(jobs['deploy']['permissions'], {'pages':'write', 'id-token':'write'})
+
+    def test_annotation_checkout_uses_event_head_and_full_history(self):
+        steps = self.workflow['jobs']['prose']['steps']
+        checkout = next(s for s in steps if 'actions/checkout@' in s.get('uses', ''))
+        self.assertEqual(checkout['with']['fetch-depth'], '0')
+        self.assertIn('github.event.pull_request.head.sha', checkout['with']['ref'])
+        run = next(s for s in steps if s.get('name') == 'Annotate changed documentation')
+        self.assertIn('github.event.pull_request.base.sha', run['env']['BASE_SHA'])
+        self.assertIn('github.event.before', run['env']['BASE_SHA'])
+        self.assertNotIn('${{', run['run'])
+        artifact = next(s for s in steps if 'actions/upload-artifact@' in s.get('uses', ''))
+        self.assertEqual(artifact['if'], 'always()')
+        self.assertEqual(artifact['with']['include-hidden-files'], 'true')
+        self.assertEqual(artifact['with']['path'], '.research/ci-prose.json')

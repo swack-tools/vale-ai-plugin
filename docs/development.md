@@ -332,7 +332,7 @@ reuse the runtime's locking implementation.
 Workflow tests evaluate the actual publication conditions for pull requests,
 main and other branch pushes, schedules, and manual events. Only a main push can
 upload the Pages artifact and deploy it. Deployment depends on tests, native
-fixtures, and the documentation build. PR jobs have read-only contents access
+fixtures, the documentation build, and [changed-document annotations](ci.html). PR jobs have read-only contents access
 and checkout credential persistence turned off. No `pull_request_target` job runs
 untrusted checkout code. The workflow doesn't configure scheduled checks.
 

@@ -122,6 +122,13 @@ GitHub Actions checks pull requests and deploys the documentation only on pushes
 to `main`, including pull request merges. See the [license](LICENSE). Bundled Google rules
 retain their upstream license.
 
+## Pull request annotations
+
+CI reports findings from entire changed documents with the same shared checker
+and project policy. It retains full JSON results and needs no PR write token or
+agent installation. See the [CI guide](https://vale.swacktech.com/ci.html) for
+selection roots, local reproduction, limits, and reuse in another repository.
+
 ## Writing evaluation
 
 The source checkout includes twelve labeled prose fixtures and an offline
