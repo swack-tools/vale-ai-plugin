@@ -1,20 +1,20 @@
 ---
 name: check-prose
-description: Check documentation and source comments with Vale, report Google style findings, and verify requested prose corrections.
+description: Use when checking saved documentation, unsaved drafts, or source comments with Vale and verifying requested prose corrections.
 ---
 
 # Check technical prose
 
 Use this skill for an explicit style check or when the user asks to verify prose
-after editing. For writing and editorial corrections, use the companion
-`google-prose` skill.
+after editing. Apply requested corrections to findings with this skill. For
+broader writing or editorial restructuring, use the companion `google-prose` skill.
 
 Resolve the checker at `../../scripts/prose_lint.py` relative to this skill's
 directory. Use the absolute resolved script path. Don't assume the plugin cache
 is in the workspace or that plugin environment variables exist in shell tools.
 Run from the user's workspace so its `.vale.ini` can override the bundled rules.
 
-If the user names files, check those files. Otherwise use the relevant prose
+For unsaved prose, use the draft workflow below. For saved prose, check named files. Otherwise use the relevant prose
 files edited in the conversation. If neither is available, ask for the scope.
 Pass each file as a separate quoted argument, with a `./` prefix for names that
 start with a hyphen. Don't interpolate the user's prose as shell code.
@@ -73,3 +73,42 @@ that operand. Report the path and reason, even when other files passed. Don't
 call an excluded document clean or bypass its policy. Reviewed vocabulary and
 format recipes live in the [configuration guide](https://vale.swacktech.com/configuration.html).
 Don't add accepted terms or weaken exclusions just to clear findings.
+
+## Check an unsaved draft
+
+Use `--stdin --ext md|txt|rst|adoc|html --format json` with the resolved checker.
+Run from the workspace. Pass draft bytes through subprocess input or a quoted
+heredoc whose delimiter doesn't occur in the draft. Never interpolate prose
+into shell code or create a staging file.
+
+Derive the logical target from the user's request. If project rules depend on
+paths and the target is missing, ask for it before checking. Pass that target
+with `--path docs/setup.md`. It selects rules without reading or writing the
+file. Otherwise the default is `draft.<ext>`. Match the declared extension.
+Use `--path=-draft.md` for a name that starts with a hyphen.
+
+```sh
+python3 /absolute/plugin/scripts/prose_lint.py --stdin --ext md --path docs/setup.md --format json <<'VALE_DRAFT'
+Use this, e.g. for testing.
+
+Run `printf "$HOME"`.
+VALE_DRAFT
+```
+
+Report the virtual `<stdin:docs/setup.md>` identity, lines, rules, status, and
+coverage caveat. Exit codes are `0` for no findings, `1` for findings, and `2`
+for incomplete or skipped checks. An empty valid draft has no findings.
+Input must be UTF-8 and at most 1 MiB. reStructuredText and AsciiDoc require their usual
+parsers. Selection exclusions and profile/configuration precedence still apply.
+
+Draft checks use the complete supplied text, even if the project selects new
+findings. Don't supply a Git baseline or combine draft mode with other manual
+modes. For requested fixes, preserve commands and technical meaning, revise only
+the draft, and submit it again. Report rule counts before and after. The workflow creates no hook
+state or user file and doesn't automatically check assistant replies.
+
+Project patterns can distinguish relative draft paths from absolute file paths.
+The tested `[**/docs/*.md]` pattern matches both. `[docs/*.md]` only matches the
+relative draft identity in Vale 3.23. Don't change project rules silently or
+claim an unmatched empty result proves coverage. See the
+[draft guide](https://vale.swacktech.com/usage.html#check-an-unsaved-draft).

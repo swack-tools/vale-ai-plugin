@@ -136,7 +136,7 @@ def run_check(root, names, *, deadline=None, documents=None, policy=None):
     return _execute(root, result, jobs, deadline, vale, captured=documents)
 
 
-def check_document(root, text, logical_path, *, deadline=None, policy=None):
+def check_document(root, text, logical_path, *, deadline=None, policy=None, relative_identity=False):
     """Lint complete in-memory text with the same decoder and configuration."""
     deadline = deadline or Deadline(50)
     policy = policy or load_policy(root)
@@ -144,9 +144,12 @@ def check_document(root, text, logical_path, *, deadline=None, policy=None):
     result = empty_result(root, [name], policy)
     path = root / name
     if (not path.is_absolute() or not path.is_relative_to(root) or '..' in path.parts or
-            not policy.supports(name) or not policy.selected(name) or
-            path.is_symlink() or any(p.is_symlink() for p in path.parents)):
+            not policy.supports(name) or
+            (not relative_identity and (path.is_symlink() or any(p.is_symlink() for p in path.parents)))):
         result.errors.append(Issue('unsupported_path', 'Invalid logical document path.', name))
+    elif not policy.selected(name):
+        result.skipped_files.append(Issue('excluded_path', 'File is excluded by the wrapper policy.', name))
+        return result.finish()
     elif len(text.encode('utf-8')) > MAX_BYTES:
         result.errors.append(Issue('file_limit', 'Document exceeds the 1 MiB file limit.', name))
     vale = shutil.which('vale')
@@ -154,7 +157,8 @@ def check_document(root, text, logical_path, *, deadline=None, policy=None):
         result.errors.append(Issue('missing_vale', 'Vale is missing from PATH.'))
     if result.errors:
         return result.finish()
-    logical = str(path.with_suffix(path.suffix.lower())) if result.coverage.source == 'bundled' else str(path)
+    identity = Path(name) if relative_identity else path
+    logical = str(identity.with_suffix(identity.suffix.lower())) if result.coverage.source == 'bundled' else str(identity)
     return _execute(root, result, [([(name, path)], logical)], deadline, vale, document=text)
 
 
