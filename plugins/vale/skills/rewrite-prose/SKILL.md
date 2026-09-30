@@ -13,12 +13,15 @@ so a project `.vale.ini` can override the bundled profile.
 ## Select files
 
 Use the user's requested scope exactly. For “all Markdown files,” enumerate
-only `*.md` and `*.mdx` files, including hidden files while respecting ignore
-rules. Exclude dependency and generated output directories unless the user
-includes them. Use null-delimited path handling, then call the checker with
-explicit `--check FILE...` operands in manageable batches. Don't use `--all`
-for a Markdown-only request. That mode can include source files and comments.
-If no Markdown files match, report that and stop.
+`.md` and `.mdx` files case-insensitively, including hidden files while
+respecting ignore rules. For example, use `rg --files --hidden -0` with globs
+`*.[mM][dD]` and `*.[mM][dD][xX]`, then pass the null-delimited paths through a
+safe argument array. Exclude dependency and generated output directories unless
+the user includes them. Prefix a root-level filename that starts with a hyphen
+with `./`, as described in `check-prose`. Call the checker with explicit
+`--check FILE...` operands in manageable batches. Don't use `--all` for a
+Markdown-only request. That mode can include source files and comments. If no
+Markdown files match, report that and stop.
 
 For named files, check only those files. For a directory, enumerate supported
 files within that directory. Don't expand a narrower request to the whole
@@ -26,14 +29,16 @@ workspace.
 
 ## Apply findings
 
-Run the checker with `--format json` and inspect every finding. Apply Vale's
-suggested replacement when the finding provides one and the replacement
-preserves the sentence's technical meaning. Read the surrounding paragraph
-before editing. Apply direct spelling, punctuation, capitalization, and
-word-choice corrections where context confirms them. When a finding needs a
-sentence rewrite or Vale provides no safe replacement, revise only when the
-intended meaning is clear. Otherwise leave it unchanged and report it for
-review.
+Run the checker with `--format json` and inspect every finding. When the JSON
+includes `comparison.actionable_indexes`, edit only findings at those indexes.
+If the comparison reports a fallback that makes all current findings
+actionable, follow that result. Apply Vale's suggested replacement when the
+finding provides one and the replacement preserves the sentence's technical
+meaning. Read the surrounding paragraph before editing. Apply direct spelling,
+punctuation, capitalization, and word-choice corrections where context confirms
+them. When a finding needs a sentence rewrite or Vale provides no safe
+replacement, revise only when the intended meaning is clear. Otherwise leave it
+unchanged and report it for review.
 
 Preserve commands, code blocks, identifiers, URLs, quoted text, product names,
 and technical behavior unless the user explicitly asks to change them. Don't
