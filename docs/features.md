@@ -13,6 +13,7 @@ usage and limits so the feature's value stays testable.
 | [Workspace audit](usage.html#choose-the-audit-scope) | Discover existing prose debt across eligible files | `--all` uses the documented exclusions and ignores session baselines. |
 | [New-findings comparison](usage.html#choose-the-audit-scope) | Focus a change on new issues in an existing document | A duplicate fixture retains the new occurrence and suppresses the old one. Conservative fallbacks reduce this benefit for custom policies and some formats. |
 | [Checking and writing skills](usage.html) | Request a review, a correction, or new documentation | Both hosts share the checker. Skills preserve technical meaning and require verification after edits. Model judgment still needs review. |
+| [Vale-guided rewrites](usage.html#rewrite-findings) | Apply Vale recommendations to selected prose or all Markdown files | The rewrite skill verifies changed files and leaves ambiguous meaning changes for review. It doesn't rewrite files automatically in the background. |
 | [Procedural writing](profiles.html) | Clarify conditions, steps, and warnings in runbooks | Experimental guidance with seven paired evaluation cases. The named profile reuses Google checks. Native model efficacy remains unverified. |
 | [Dual marketplaces](marketplaces.html) | Discover and update the plugin in either client | Local marketplace smoke tests verify actual client loading. These catalogs aren't official curated listings. |
 | [Project and user installers](installation.html#project-or-user-hooks-without-a-marketplace) | Share portable hooks or use them across projects | Tests verify both hosts, preserved settings, backups, updates, and removal. Hook-only installations don't add skills. |
@@ -33,10 +34,11 @@ usage and limits so the feature's value stays testable.
 ## Keep the surface small
 
 The legacy prompt is a compatibility feature with limited value for current
-clients. New installations should use skills. Additional heuristic profiles,
-interactive baseline cleanup, automatic rewrites, and general lint-result
-caching aren't part of this release. Add them only after evidence shows a
-benefit that justifies their maintenance and failure modes.
+clients. New installations should use skills. The rewrite skill applies
+Vale-guided edits only when requested. It doesn't rewrite files in the
+background. Additional heuristic profiles, interactive baseline cleanup, and
+general lint-result caching aren't part of this release. Add them only after
+evidence shows a benefit that justifies their maintenance and failure modes.
 
 The Google rules automate part of an editorial guide. They don't certify
 Simplified Technical English, format Google Docs, or prove that a document is

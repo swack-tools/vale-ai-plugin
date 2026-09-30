@@ -61,7 +61,7 @@ def install(config, user, uninstall, host="codex", feedback_scope=None):
         staging = Path(tempfile.mkdtemp(prefix='.vale-install-', dir=config))
         try:
             shutil.copytree(SOURCE, staging, dirs_exist_ok=True, ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
-            (staging / OWNERSHIP).write_text(json.dumps({'package': 'vale', 'version': '0.6.0'}) + '\n')
+            (staging / OWNERSHIP).write_text(json.dumps({'package': 'vale', 'version': '0.7.0'}) + '\n')
             # Remove only files from our previous installed package; backups remain.
             if destination.exists():
                 shutil.rmtree(destination)

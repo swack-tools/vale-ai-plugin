@@ -1,0 +1,4 @@
+interface:
+  display_name: "Rewrite prose"
+  short_description: "Apply Vale recommendations and verify edits."
+  default_prompt: "Use $rewrite-prose to apply Vale's safe recommendations to these files, then verify them."

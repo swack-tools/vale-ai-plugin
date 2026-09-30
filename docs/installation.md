@@ -75,8 +75,9 @@ claude plugin install vale@vale --scope project
 
 Review the resulting `.claude/settings.json` before committing it. Restart
 Claude Code and inspect `/hooks`. The plugin exposes the
-`/vale:check-prose`, `/vale:google-prose`, and `/vale:procedural-prose` skills.
-Skills also support automatic selection when your request matches their purpose.
+`/vale:check-prose`, `/vale:google-prose`, `/vale:rewrite-prose`, and
+`/vale:procedural-prose` skills. Skills also support automatic selection when
+your request matches their purpose.
 
 ## Codex plugin
 
@@ -91,8 +92,8 @@ Start a new chat. Open `/hooks` to review and trust Vale's definitions. Trust
 project configuration when prompted. If hooks are off, start Codex with
 `codex --enable hooks`.
 
-Invoke `$vale:check-prose` or `$vale:google-prose`, or select the skill through `/skills`.
-Codex manages the plugin installation through your user configuration.
+Invoke `$vale:check-prose`, `$vale:google-prose`, or `$vale:rewrite-prose`, or
+select a skill through `/skills`. Codex manages the plugin installation through your user configuration.
 For a portable project hook installation, use the installer below.
 
 ### Legacy slash command compatibility

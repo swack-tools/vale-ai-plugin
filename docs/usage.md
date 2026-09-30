@@ -6,6 +6,7 @@
 | --- | --- | --- |
 | Automatic hooks | Enabled plugin hooks | Enabled and trusted plugin hooks |
 | On-demand review | `/vale:check-prose` | `$vale:check-prose` or `/skills` |
+| Vale-guided rewrite | `/vale:rewrite-prose` | `$vale:rewrite-prose` or `/skills` |
 | Procedural guidance | `/vale:procedural-prose` | `$vale:procedural-prose` or `/skills` |
 | Writing guidance | `/vale:google-prose` | `$vale:google-prose` or `/skills` |
 | Legacy prompt command | Use the checking skill | `/prompts:vale` on legacy clients only |
@@ -55,6 +56,29 @@ On older Codex clients that support the legacy prompt command:
 The agent preserves technical meaning, code examples, identifiers, and URLs.
 It checks the edited files again and reports any unresolved findings. The
 checker itself doesn't rewrite files or weaken your policy.
+
+## Rewrite findings
+
+Use the rewrite skill when you want the agent to apply Vale's recommended
+corrections and verify the edited files. For example, ask Claude Code to:
+
+```text
+/vale:rewrite-prose Rewrite all Markdown files using Vale's recommended corrections. Preserve technical meaning and verify every changed file.
+```
+
+In Codex, use:
+
+```text
+$vale:rewrite-prose Rewrite all Markdown files using Vale's recommended corrections. Preserve technical meaning and verify every changed file.
+```
+
+For this request, the skill checks `.md` and `.mdx` files without regard to
+extension case. It uses individual file operands rather than the broader `--all`
+workspace audit. It applies direct recommendations when context supports them,
+leaves ambiguous meaning changes for review, and reports unresolved findings.
+Commands, code, identifiers, and URLs remain unchanged unless you ask to revise
+them. In `new-findings` mode, it changes only the actionable findings selected
+by the comparison unless the checker reports a fallback to full-file findings.
 
 ## Write new documentation
 

@@ -135,6 +135,62 @@
       "evidence": "documented"
     },
     {
+      "id": "skill-rewrite-prose-claude-code",
+      "capability_refs": ["skill:rewrite-prose"],
+      "title": "Apply Vale recommendations in Claude Code",
+      "input_or_trigger": "/vale:rewrite-prose Rewrite all Markdown files using Vale's recommended corrections. Preserve technical meaning and verify every changed file.",
+      "platform": "claude-code",
+      "prerequisites": [
+        "Install the Vale Claude Code plugin. Provide Python 3.11+ and Vale 3.23+. Native Windows is not supported."
+      ],
+      "expected_behavior": "Check only Markdown files, apply context-safe Vale recommendations, preserve technical meaning, verify changed files, and report unresolved findings.",
+      "sources": [
+        {
+          "path": "docs/usage.md",
+          "format": "markdown",
+          "mode": "section",
+          "required": true,
+          "heading_path": ["Commands, skills, and examples", "Rewrite findings"]
+        },
+        {
+          "path": "docs/installation.md",
+          "format": "markdown",
+          "mode": "section",
+          "required": true,
+          "heading_path": ["Installation", "Requirements"]
+        }
+      ],
+      "evidence": "documented"
+    },
+    {
+      "id": "skill-rewrite-prose-codex",
+      "capability_refs": ["skill:rewrite-prose"],
+      "title": "Apply Vale recommendations in Codex",
+      "input_or_trigger": "$vale:rewrite-prose Rewrite all Markdown files using Vale's recommended corrections. Preserve technical meaning and verify every changed file.",
+      "platform": "codex",
+      "prerequisites": [
+        "Install the Vale Codex plugin. Provide Python 3.11+ and Vale 3.23+. Native Windows is not supported."
+      ],
+      "expected_behavior": "Check only Markdown files, apply context-safe Vale recommendations, preserve technical meaning, verify changed files, and report unresolved findings.",
+      "sources": [
+        {
+          "path": "docs/usage.md",
+          "format": "markdown",
+          "mode": "section",
+          "required": true,
+          "heading_path": ["Commands, skills, and examples", "Rewrite findings"]
+        },
+        {
+          "path": "docs/installation.md",
+          "format": "markdown",
+          "mode": "section",
+          "required": true,
+          "heading_path": ["Installation", "Requirements"]
+        }
+      ],
+      "evidence": "documented"
+    },
+    {
       "id": "skill-procedural-prose-claude-code",
       "capability_refs": ["skill:procedural-prose"],
       "title": "Revise a procedure in Claude Code",

@@ -50,6 +50,9 @@ installation guide for that compatibility path.
 - **Automatic checks:** observe file changes after tools run and before a turn ends.
 - **Review:** `/vale:check-prose README.md review only` in Claude Code, or
   `$vale:check-prose Review README.md without editing` in Codex.
+- **Rewrite:** `/vale:rewrite-prose Rewrite all Markdown files using Vale's
+  recommendations and verify them` in Claude Code, or use the same request
+  with `$vale:rewrite-prose` in Codex.
 - **Write and fix:** use the `google-prose` skill to revise technical prose and
   verify it with Vale.
 - **Audit scope:** use `--all` for every eligible workspace file, or

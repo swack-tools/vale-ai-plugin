@@ -35,6 +35,24 @@ clean result. Report remaining findings and unavailable dependencies separately
 from clean checks. A clean result covers the configured rules, not the entire
 Google style guide.
 
+When the user asks to “report findings,” “list findings,” or asks what to
+change, report every actionable finding from the selected files. Include the
+relative path, line, column when available, rule, excerpt, and a specific
+suggested correction. Don't substitute rule
+counts, top examples, or the files with the most findings for the finding list.
+For a generated Markdown report or a long findings list, use a Markdown table
+with one row per finding and columns for file, line, rule, excerpt, and suggested
+change. Keep each finding separate so readers can locate and act on it. If a
+table would be unwieldy for a short chat response, use a compact list instead.
+When the results contain hundreds of findings, ask whether the user wants a
+Markdown report saved in the workspace. If they do, create a table with one row
+per finding and link the report in the response. Otherwise, provide the complete
+list in numbered batches.
+If the result is too long for one response, group findings by file and deliver
+the complete list in numbered batches. State the total and which batch the
+response contains, then continue until you cover all findings. You may first give a
+brief summary, but it must accompany the complete list, not replace it.
+
 For structured results, add `--format json`. Exit `2` and status `incomplete`
 indicate configuration, parser, or execution errors, which need diagnosis
 rather than prose edits. Use `--doctor` to inspect the selected engine and
@@ -45,9 +63,30 @@ review is complete.
 
 ## Choose a check scope
 
-Use `--all` only when the user requests a full workspace audit. It enumerates
-eligible files under the same exclusions as hooks. Keep `--check FILE...` for
-named files or a requested directory's enumerated files.
+Use `--all` only when the user requests a full workspace audit across every
+eligible prose file. It can include source files and source comments. It does
+not mean every file of a user-specified type.
+
+When the user names an extension such as “all Markdown files,” enumerate only
+matching files and pass those paths to `--check`. Don't use `--all` for a
+type-limited request. Include tracked and non-ignored untracked files. Exclude
+generated or dependency directories such as `.git`, `node_modules`, and build
+output unless the user explicitly includes them. For Markdown, use Python's
+standard library to run `git ls-files --cached --others --exclude-standard -z`
+from the workspace root, split its output at each zero byte, and keep paths whose
+suffix lowercased is `.md` or `.mdx`. This includes uppercase and mixed-case
+extensions and honors Git ignore rules. Keep only existing regular files.
+Exclude symlink paths and deleted tracked paths, and report them as skipped.
+In a non-Git workspace, use Python's `os.walk`, include hidden files, prune
+generated and dependency directories, and keep only existing regular,
+non-symlink files. Report that Git ignore rules aren't available. Pass paths
+through a safe argument array and limit each `--check` invocation to 50 files.
+If a root-level filename starts with a hyphen, prefix it with `./`. If no files
+match, say so and don't run `--all`.
+
+For a named directory request, identify the supported files, then check each
+batch with `--check FILE...`, up to 50 files per invocation. For a request
+covering all workspace files with no type restriction, use `--all`.
 
 For new findings in named files, require an explicit Git baseline:
 

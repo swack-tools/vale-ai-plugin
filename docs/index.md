@@ -14,11 +14,13 @@ on-demand checking command, and shared writing skills.
 | Check edits while you work | Automatic pre-tool, post-tool, and Stop hooks |
 | Review selected files | `check-prose` skill and command |
 | Write or improve technical prose | `google-prose` skill |
+| Apply and verify Vale recommendations | `rewrite-prose` skill |
 | Revise a runbook procedure | `procedural-prose` skill |
 
-Claude Code exposes `/vale:check-prose`, `/vale:google-prose`, and
-`/vale:procedural-prose`. Codex accepts `$vale:check-prose`,
-`$vale:google-prose`, and `$vale:procedural-prose` skill mentions or the
+Claude Code exposes `/vale:check-prose`, `/vale:google-prose`,
+`/vale:rewrite-prose`, and `/vale:procedural-prose`. Codex accepts
+`$vale:check-prose`, `$vale:google-prose`, `$vale:rewrite-prose`, and
+`$vale:procedural-prose` skill mentions or the
 `/skills` picker. The repository also has a legacy `/prompts:vale` template for
 older Codex clients that support custom prompts. It isn't a current standalone
 command. Codex 0.158.0 uses the skill interfaces.
