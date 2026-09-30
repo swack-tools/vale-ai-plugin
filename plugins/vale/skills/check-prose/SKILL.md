@@ -75,15 +75,18 @@ output unless the user explicitly includes them. For Markdown, use Python's
 standard library to run `git ls-files --cached --others --exclude-standard -z`
 from the workspace root, split its output at each zero byte, and keep paths whose
 suffix lowercased is `.md` or `.mdx`. This includes uppercase and mixed-case
-extensions and honors Git ignore rules. In a non-Git workspace, use Python's
-`os.walk`, include hidden files, prune generated and dependency directories,
-and report that Git ignore rules aren't available. Pass paths through a safe
-argument array. If a root-level filename starts with a hyphen, prefix it with
-`./`. If no files match, say so and don't run `--all`.
+extensions and honors Git ignore rules. Keep only existing regular files.
+Exclude symlink paths and deleted tracked paths, and report them as skipped.
+In a non-Git workspace, use Python's `os.walk`, include hidden files, prune
+generated and dependency directories, and keep only existing regular,
+non-symlink files. Report that Git ignore rules aren't available. Pass paths
+through a safe argument array and limit each `--check` invocation to 50 files.
+If a root-level filename starts with a hyphen, prefix it with `./`. If no files
+match, say so and don't run `--all`.
 
 For a named directory request, identify the supported files, then check each
-with `--check FILE...`. For a request covering all workspace files with no type
-restriction, use `--all`.
+batch with `--check FILE...`, up to 50 files per invocation. For a request
+covering all workspace files with no type restriction, use `--all`.
 
 For new findings in named files, require an explicit Git baseline:
 

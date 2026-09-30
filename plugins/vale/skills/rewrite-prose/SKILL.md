@@ -15,16 +15,19 @@ so a project `.vale.ini` can override the bundled profile.
 Use the user's requested scope exactly. For “all Markdown files” in a Git
 workspace, use Python's standard library to run
 `git ls-files --cached --others --exclude-standard -z` from the workspace root.
-Split its output at each zero byte and keep paths whose suffix, lowercased, is `.md`
-or `.mdx`. This includes hidden, tracked, and non-ignored untracked files while
-honoring Git ignore rules. Don't require ripgrep. In a non-Git workspace, use
-Python's `os.walk`, include hidden files, prune `.git`, dependency, and generated
-directories, and report that Git ignore rules aren't available. Prefix a
-root-level filename that starts with a hyphen with `./`, as described in
-`check-prose`. Pass paths through a safe argument array and call the checker
-with explicit `--check FILE...` operands in manageable batches. Don't use
-`--all` for a Markdown-only request. That mode can include source files and
-comments. If no Markdown files match, report that and stop.
+Split its output at each zero byte and keep paths whose suffix, lowercased, is
+`.md` or `.mdx`. Keep only existing regular files. Exclude symlink paths and
+deleted tracked paths, and report them as skipped. This includes hidden,
+tracked, and non-ignored untracked files while honoring Git ignore rules. Don't
+require ripgrep. In a non-Git workspace, use Python's `os.walk`, include hidden
+files, prune `.git`, dependency, and generated directories, and keep only
+existing regular, non-symlink files. Report that Git ignore rules aren't
+available. Prefix a root-level filename that starts with a hyphen with `./`, as
+described in `check-prose`. Pass paths through a safe argument array and call
+the checker with explicit `--check FILE...` operands in batches of no more than
+50 files per invocation. Don't use `--all` for a Markdown-only request. That
+mode can include source files and comments. If no Markdown files match, report
+that and stop.
 
 For named files, check only those files. For a directory, enumerate supported
 files within that directory. Don't expand a narrower request to the whole
