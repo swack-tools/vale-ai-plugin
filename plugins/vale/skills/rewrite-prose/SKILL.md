@@ -1,6 +1,6 @@
 ---
 name: rewrite-prose
-description: Apply Vale's recommended prose corrections to saved documentation, then verify the edits. Use for requested prose rewrites or bulk Markdown cleanup.
+description: Apply Vale recommendations to saved prose and verify the edits. Use for explicit Vale-guided rewrites or bulk cleanup.
 ---
 
 # Rewrite technical prose
@@ -12,16 +12,19 @@ so a project `.vale.ini` can override the bundled profile.
 
 ## Select files
 
-Use the user's requested scope exactly. For “all Markdown files,” enumerate
-`.md` and `.mdx` files case-insensitively, including hidden files while
-respecting ignore rules. For example, use `rg --files --hidden -0` with globs
-`*.[mM][dD]` and `*.[mM][dD][xX]`, then pass the null-delimited paths through a
-safe argument array. Exclude dependency and generated output directories unless
-the user includes them. Prefix a root-level filename that starts with a hyphen
-with `./`, as described in `check-prose`. Call the checker with explicit
-`--check FILE...` operands in manageable batches. Don't use `--all` for a
-Markdown-only request. That mode can include source files and comments. If no
-Markdown files match, report that and stop.
+Use the user's requested scope exactly. For “all Markdown files” in a Git
+workspace, use Python's standard library to run
+`git ls-files --cached --others --exclude-standard -z` from the workspace root.
+Split its output at each zero byte and keep paths whose suffix, lowercased, is `.md`
+or `.mdx`. This includes hidden, tracked, and non-ignored untracked files while
+honoring Git ignore rules. Don't require ripgrep. In a non-Git workspace, use
+Python's `os.walk`, include hidden files, prune `.git`, dependency, and generated
+directories, and report that Git ignore rules aren't available. Prefix a
+root-level filename that starts with a hyphen with `./`, as described in
+`check-prose`. Pass paths through a safe argument array and call the checker
+with explicit `--check FILE...` operands in manageable batches. Don't use
+`--all` for a Markdown-only request. That mode can include source files and
+comments. If no Markdown files match, report that and stop.
 
 For named files, check only those files. For a directory, enumerate supported
 files within that directory. Don't expand a narrower request to the whole

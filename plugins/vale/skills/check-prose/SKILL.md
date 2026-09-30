@@ -69,13 +69,17 @@ not mean every file of a user-specified type.
 
 When the user names an extension such as “all Markdown files,” enumerate only
 matching files and pass those paths to `--check`. Don't use `--all` for a
-type-limited request. Include tracked and untracked files,
-respecting repository ignore rules, and exclude generated or dependency
-directories such as `.git`, `node_modules`, and build output unless the user
-explicitly includes them. For Markdown, enumerate `*.md` and `*.mdx` files.
-Use null-delimited path handling so spaces and unusual characters remain safe.
-Pass every file as a separate operand after `--check`. If no files match, say so
-and don't run `--all`.
+type-limited request. Include tracked and non-ignored untracked files. Exclude
+generated or dependency directories such as `.git`, `node_modules`, and build
+output unless the user explicitly includes them. For Markdown, use Python's
+standard library to run `git ls-files --cached --others --exclude-standard -z`
+from the workspace root, split its output at each zero byte, and keep paths whose
+suffix lowercased is `.md` or `.mdx`. This includes uppercase and mixed-case
+extensions and honors Git ignore rules. In a non-Git workspace, use Python's
+`os.walk`, include hidden files, prune generated and dependency directories,
+and report that Git ignore rules aren't available. Pass paths through a safe
+argument array. If a root-level filename starts with a hyphen, prefix it with
+`./`. If no files match, say so and don't run `--all`.
 
 For a named directory request, identify the supported files, then check each
 with `--check FILE...`. For a request covering all workspace files with no type
