@@ -56,6 +56,27 @@ The agent preserves technical meaning, code examples, identifiers, and URLs.
 It checks the edited files again and reports any unresolved findings. The
 checker itself doesn't rewrite files or weaken your policy.
 
+## Rewrite findings
+
+Use the rewrite skill when you want the agent to apply Vale's recommended
+corrections and verify the edited files. For example, ask Claude Code to:
+
+```text
+/vale:rewrite-prose Rewrite all Markdown files using Vale's recommended corrections. Preserve technical meaning and verify every changed file.
+```
+
+In Codex, use:
+
+```text
+$vale:rewrite-prose Rewrite all Markdown files using Vale's recommended corrections. Preserve technical meaning and verify every changed file.
+```
+
+For this request, the skill checks only `.md` and `.mdx` files. It uses
+individual file operands rather than the broader `--all` workspace audit. It
+applies direct recommendations when context supports them, leaves ambiguous
+meaning changes for review, and reports unresolved findings. Commands, code,
+identifiers, and URLs remain unchanged unless you ask to revise them.
+
 ## Write new documentation
 
 ```text

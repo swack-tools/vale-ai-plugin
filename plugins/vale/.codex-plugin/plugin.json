@@ -1,15 +1,15 @@
 {
   "name": "vale",
   "version": "0.6.0",
-  "description": "Google documentation style checks for Claude Code and Codex.",
+  "description": "Check and rewrite documentation with Google style guidance.",
   "author": {
     "name": "Swack Tools"
   },
   "skills": "./skills/",
   "interface": {
     "displayName": "Vale",
-    "shortDescription": "Check docs and comments with Vale.",
-    "longDescription": "Check and improve docs and comments with Vale hooks and shared prose skills.",
+    "shortDescription": "Check and rewrite docs with Vale.",
+    "longDescription": "Check and revise docs and comments with Vale hooks and shared prose skills.",
     "developerName": "Swack Tools",
     "category": "Productivity",
     "capabilities": [],

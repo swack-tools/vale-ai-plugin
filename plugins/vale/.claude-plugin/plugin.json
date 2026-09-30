@@ -1,7 +1,7 @@
 {
   "name": "vale",
   "version": "0.6.0",
-  "description": "Google documentation style checks for Claude Code and Codex.",
+  "description": "Check and rewrite documentation with Google style guidance.",
   "author": {
     "name": "Swack Tools"
   },
