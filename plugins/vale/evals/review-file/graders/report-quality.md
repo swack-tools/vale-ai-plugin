@@ -14,6 +14,6 @@ The bundled Google rules report seven findings for docs/guide.md:
 6. Line 5, `Google.Will`: "will" in "it will just work".
 7. Line 5, `Google.Exclamation`: the exclamation point.
 
-PASS if the response reports all seven findings as separate items, each with its line number, rule name, and a specific suggested correction, and states that it didn't edit the file.
+PASS if the response reports all seven findings as separate items and states that it didn't edit the file. Each item must include the path, line, column (the checker reports one for every finding), rule, the matched excerpt, and a specific suggested correction, as the `check-prose` skill requires.
 
-FAIL if any of the seven findings is missing, if the response replaces the list with counts or examples, omits line numbers, rule names, or corrections, says it edited the file, or claims complete Google style-guide compliance.
+FAIL if any of the seven findings is missing, if the response replaces the list with counts or examples, if any item lacks the path, line, column, rule, excerpt, or suggested correction, says it edited the file, or claims complete Google style-guide compliance.
