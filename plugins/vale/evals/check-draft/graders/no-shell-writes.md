@@ -1,0 +1,8 @@
+---
+type: tool_used
+tool: Bash
+input_match: '(?:(?:^|\\*"command\\*"\s*:\s*\\*"|\\n|[;&|(`]|\$\(|-exec\s)\s*(?:(?:sudo|command|env|xargs)\s+(?:-\S+\s+)*)?(?:sed|perl|ruby)\s+(?:-[a-zA-Z]*\s+)*-[a-zA-Z]*i|(?:^|\\*"command\\*"\s*:\s*\\*"|\\n|[;&|(`]|\$\(|-exec\s)\s*(?:(?:sudo|command|env|xargs)\s+(?:-\S+\s+)*)?awk\s[^\n]*-i\s*inplace|(?:^|\\*"command\\*"\s*:\s*\\*"|\\n|[;&|(`]|\$\(|-exec\s)\s*(?:(?:sudo|command|env|xargs)\s+(?:-\S+\s+)*)?(?:ed|ex)\s+-s\b|(?:^|\\*"command\\*"\s*:\s*\\*"|\\n|[;&|(`]|\$\(|-exec\s)\s*(?:(?:sudo|command|env|xargs)\s+(?:-\S+\s+)*)?dd\s[^\n]*\bof=|(?:^|\\*"command\\*"\s*:\s*\\*"|\\n|[;&|(`]|\$\(|-exec\s)\s*(?:(?:sudo|command|env|xargs)\s+(?:-\S+\s+)*)?(?:mv|cp|rm|touch|truncate|install|ln|chmod|unlink|rsync|tee)\s|(?:^|\\*"command\\*"\s*:\s*\\*"|\\n|[;&|(`]|\$\(|-exec\s)\s*(?:(?:sudo|command|env|xargs)\s+(?:-\S+\s+)*)?mktemp\b|(?:^|\\*"command\\*"\s*:\s*\\*"|\\n|[;&|(`]|\$\(|-exec\s)\s*(?:(?:sudo|command|env|xargs)\s+(?:-\S+\s+)*)?(?:git\s+(?:-C\s+\S+\s+)?(?:commit|checkout|switch|stash|reset|restore|add|rm|mv|apply|merge|rebase|cherry-pick|tag|update-ref|notes|init|worktree|gc|prune|clean|fetch|pull|push|am|revert)\b|git\s+(?:-C\s+\S+\s+)?branch\s+(?:-[dDmMcCf]\b|[^-\s])|git\s+(?:-C\s+\S+\s+)?config\s+(?:--(?:global|local|system|worktree|file\s+\S+)\s+)*(?:--(?:unset|unset-all|add|replace-all|rename-section|remove-section|edit)\b|-e\b|\w[\w.-]*\s+[^-\s]))|\s-delete\b|open\([^)]*[\\"''][wax]\+?[\\"'']|\b(?:os|shutil|pathlib)\.(?:remove|unlink|rename|replace|move|copy\w*|rmtree)\(|\.(?:unlink|rename|replace|touch|write_text|write_bytes)\(|(?:^|[\s;&|(])>>?\s*(?!&|/dev/null)[^\s&|;])'
+min: 0
+max: 0
+arm: both
+---
