@@ -8,3 +8,4 @@ site/
 .env.*
 /TODO/
 /evals/results/
+/plugins/vale/evals/results/

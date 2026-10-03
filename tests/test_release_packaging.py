@@ -42,6 +42,19 @@ class ReleasePackagingTests(unittest.TestCase):
                     self.assertIn(f"vale/{included}", archive.namelist())
                     self.assertNotIn(f"vale/{excluded}", archive.namelist())
 
+    def test_archives_exclude_eval_suite(self):
+        (self.plugin / "evals" / "smoke").mkdir(parents=True)
+        (self.plugin / "evals" / "smoke" / "prompt.md").write_text("Check prose.", encoding="utf-8")
+        with patch.object(package_release, "ROOT", self.root), patch.object(
+            package_release, "PLUGIN", self.plugin
+        ):
+            for client in ("claude", "codex"):
+                target = self.root / f"vale-{client}.zip"
+                package_release.archive(target, client)
+                with zipfile.ZipFile(target) as archive:
+                    self.assertIn("vale/shared.txt", archive.namelist())
+                    self.assertFalse(any(name.startswith("vale/evals/") for name in archive.namelist()))
+
     def test_archives_are_reproducible(self):
         with patch.object(package_release, "ROOT", self.root), patch.object(
             package_release, "PLUGIN", self.plugin
