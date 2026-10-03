@@ -9,10 +9,12 @@ this directory.
 Run the suite from the repository root:
 
 ```sh
-claude plugin eval plugins/vale --scaffold --allow-tools Bash Edit Write
+claude plugin eval plugins/vale --scaffold --allow-tools Bash Edit Write --judge-model sonnet
 ```
 
-Most cases need `Bash` to run the checker. The rewrite cases also need `Edit`
+The `--judge-model sonnet` flag uses a Sonnet-tier judge for the LLM graders,
+which assess meaning preservation and complete finding lists. Most cases need
+`Bash` to run the checker. The rewrite cases also need `Edit`
 and `Write`. The `--scaffold` flag runs each case's `setup.sh`, which writes
 sample files into the case's empty workspace. Install Python 3.11 or later and
 Vale 3.23 or later first.
