@@ -1,7 +1,7 @@
 ---
 type: llm
 focus: trace
-arm: with-only
+arm: both
 ---
 
 PASS if, after the last tool call that modifies CHANGELOG.md, the trace contains a `prose_lint.py --check` run on CHANGELOG.md with no `--include`, `--exclude`, `--clear-include`, `--clear-exclude`, `--profile`, `--scope`, or `--base-ref` override, and that run reports status `clean` with an empty `findings` list and no skipped files.

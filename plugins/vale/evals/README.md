@@ -28,10 +28,11 @@ Before you run the suite, install these prerequisites:
   suite under WSL2. Without a sandbox, Claude Code refuses every Bash-granting
   run.
 
-The default ablation adds a no-plugin baseline arm. Skill-trigger graders and
-graders marked `arm: with-only`, such as checker-run checks, report whether the
-plugin fired and don't count toward either score. Negative tool assertions use
-`arm: both`.
+The default ablation adds a no-plugin baseline arm. Skill-trigger graders
+report whether the plugin fired and don't count toward either score.
+Checker-run graders and negative tool assertions use `arm: both`, so they count
+in both arms. The baseline arm has no bundled checker, so it fails the
+checker-run graders by design.
 
 An LLM judge sees only the first and last 12 trace messages. Read-only cases
 also use `no-shell-writes.md`, a regular expression over every Bash call that

@@ -1,7 +1,7 @@
 ---
 type: llm
 focus: trace
-arm: with-only
+arm: both
 weight: 2
 ---
 

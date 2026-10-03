@@ -1,7 +1,7 @@
 ---
 type: llm
 focus: trace
-arm: with-only
+arm: both
 ---
 
 PASS if the trace shows a completed `prose_lint.py --check` run whose submitted files include docs/guide.md, and every finding in the final response appears in that run's output.

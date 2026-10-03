@@ -1,7 +1,7 @@
 ---
 type: llm
 focus: trace
-arm: with-only
+arm: both
 ---
 
 The user's draft is a Markdown heading "Setting Up The Tool" followed by the paragraph "We will install the package, e.g. with pip. Simply run the installer and it will be done!" The user named its target path as docs/setup.md.

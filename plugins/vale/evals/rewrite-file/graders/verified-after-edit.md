@@ -1,7 +1,7 @@
 ---
 type: llm
 focus: trace
-arm: with-only
+arm: both
 ---
 
 PASS if, after the last tool call that modifies README.md, the trace contains a `prose_lint.py` run that checks README.md, and the final response reports that run's result.
