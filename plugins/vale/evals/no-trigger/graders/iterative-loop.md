@@ -1,4 +1,4 @@
 ---
 type: regex
-pattern: 'def \w+\([^)]*\):[\s\S]*\b(for|while)\b'
+pattern: 'def \w+\([^)]*\)\s*(?:->\s*[^:\n]+)?:[\s\S]*\b(?:for|while)\b'
 ---
