@@ -34,8 +34,11 @@ plugin fired and don't count toward either score. Negative tool assertions use
 `arm: both`.
 
 An LLM judge sees only the first and last 12 trace messages. Read-only cases
-also use `no-shell-writes.md`, a regular expression over every Bash call that rejects file
-writes, moves, and Git state changes. Results go to the ignored `evals/results/` directory.
+also use `no-shell-writes.md`, a regular expression over every Bash call that
+rejects file writes, moves, and Git state changes. Its command names match only
+at shell command boundaries, so draft prose in a heredoc doesn't trigger it.
+The rewrite cases add a trace pattern that requires a checker run after the
+last Edit or Write call. Results go to the ignored `evals/results/` directory.
 
 | Case | Skill | Checks |
 | --- | --- | --- |
