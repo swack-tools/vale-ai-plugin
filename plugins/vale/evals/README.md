@@ -3,8 +3,8 @@
 These cases run with `claude plugin eval`. They check that each Vale skill
 triggers for the right requests and preserves technical meaning. Every case
 that checks, writes, or revises prose also requires a bundled checker run. The
-`marketing-unchanged` and `no-trigger` cases don't. Release archives exclude
-this directory.
+`marketing-unchanged` and `no-trigger` cases don't. Every install channel
+ships this directory with the package. The suite runs only when invoked.
 
 Run the suite from the repository root:
 

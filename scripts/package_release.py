@@ -10,8 +10,6 @@ PLUGIN = ROOT / "plugins/vale"
 OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "dist/release"
 EXCLUDED_PARTS = {".git", "__pycache__", "node_modules"}
 EXCLUDED_NAMES = {".DS_Store", "Thumbs.db"}
-# Eval cases for `claude plugin eval` live in the package but don't ship.
-EXCLUDED_TOP_LEVEL = {"evals"}
 
 
 def archive(target: Path, client: str) -> None:
@@ -21,8 +19,6 @@ def archive(target: Path, client: str) -> None:
             continue
         rel = source.relative_to(PLUGIN)
         if any(part in EXCLUDED_PARTS for part in rel.parts) or source.name in EXCLUDED_NAMES:
-            continue
-        if rel.parts[0] in EXCLUDED_TOP_LEVEL:
             continue
         if client == "claude" and rel.parts[0] == ".codex-plugin":
             continue
