@@ -24,6 +24,9 @@ Before you run the suite, install these prerequisites:
 - Git 2.32 or later, because the scaffolds set `GIT_CONFIG_GLOBAL`
 - Python 3.11 or later
 - Vale 3.23 or later
+- On Linux, `bubblewrap` and `socat` for the Bash sandbox. On Windows, run the
+  suite under WSL2. Without a sandbox, Claude Code refuses every Bash-granting
+  run.
 
 The default ablation adds a no-plugin baseline arm. Skill-trigger graders and
 graders marked `arm: with-only`, such as checker-run checks, report whether the
