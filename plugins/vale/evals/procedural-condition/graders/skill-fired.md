@@ -2,5 +2,4 @@
 type: tool_used
 tool: Skill
 input_match: '"skill"\s*:\s*"(?:vale:)?procedural-prose"'
-arm: with-only
 ---

@@ -14,11 +14,13 @@ claude plugin eval plugins/vale --scaffold --allow-tools Bash Edit Write
 
 Most cases need `Bash` to run the checker. The rewrite cases also need `Edit`
 and `Write`. The `--scaffold` flag runs each case's `setup.sh`, which writes
-sample files into the case's empty workspace. Install Vale and Python 3 first.
+sample files into the case's empty workspace. Install Python 3.11 or later and
+Vale 3.23 or later first.
 
-The default ablation adds a no-plugin baseline arm. Graders marked
-`arm: with-only` report whether the plugin fired and don't count toward the
-baseline score. Results go to the ignored `evals/results/` directory.
+The default ablation adds a no-plugin baseline arm. Skill-trigger graders and
+graders marked `arm: with-only`, such as checker-run checks, report whether the
+plugin fired and don't count toward either score. Negative tool assertions use
+`arm: both`. Results go to the ignored `evals/results/` directory.
 
 | Case | Skill | Checks |
 | --- | --- | --- |

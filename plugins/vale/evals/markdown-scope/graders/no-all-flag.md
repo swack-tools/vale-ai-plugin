@@ -4,4 +4,5 @@ tool: Bash
 input_match: 'prose_lint\.py[^\n]*--all'
 min: 0
 max: 0
+arm: both
 ---
