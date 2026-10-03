@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# Keep synthetic commits independent of the operator's Git settings.
+export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 git init -q .
 mkdir -p docs src
 printf '# Overview\n\nWe will cover the basics, e.g. setup.\n' > docs/overview.md

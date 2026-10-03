@@ -1,5 +1,5 @@
 ---
 type: file_exists
-path: "**/setup.md"
+path: "**/*"
 exists: false
 ---

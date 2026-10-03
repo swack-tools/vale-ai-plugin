@@ -1,8 +1,10 @@
 # Plugin evals
 
 These cases run with `claude plugin eval`. They check that each Vale skill
-triggers for the right requests, runs the bundled checker, and preserves
-technical meaning. Release archives exclude this directory.
+triggers for the right requests and preserves technical meaning. Every case
+that checks, writes, or revises prose also requires a bundled checker run. The
+`marketing-unchanged` and `no-trigger` cases don't. Release archives exclude
+this directory.
 
 Run the suite from the repository root:
 
@@ -25,10 +27,10 @@ baseline score. Results go to the ignored `evals/results/` directory.
 | `markdown-scope` | `check-prose` | Checks only Markdown files, including uppercase extensions, and never uses `--all`. |
 | `new-findings-baseline` | `check-prose` | Asks for a Git revision instead of choosing a baseline. |
 | `rewrite-file` | `rewrite-prose` | Applies findings, preserves commands and code, and verifies the result. |
-| `no-rule-weakening` | `check-prose`, `rewrite-prose` | Fixes prose without disabling rules or adding vocabulary. |
+| `no-rule-weakening` | `check-prose`, `rewrite-prose` | Fixes and rechecks prose without disabling rules or adding vocabulary. |
 | `google-write` | `google-prose` | Writes new content in Google style and runs the checker. |
-| `procedural-condition` | `procedural-prose` | Preserves a compound negated condition and its prohibition. |
+| `procedural-condition` | `procedural-prose` | Preserves a compound negated condition and its prohibition, then runs the checker. |
 | `marketing-unchanged` | `procedural-prose` | Leaves marketing copy out of procedural structure. |
-| `no-trigger` | None | Loads no Vale skill for an unrelated coding request. |
+| `no-trigger` | None | Loads no Vale skill and returns a working iterative function for an unrelated coding request. |
 
 The repository-level `evals/` directory holds a separate offline prose corpus.
