@@ -28,9 +28,9 @@ plugin fired and don't count toward either score. Negative tool assertions use
 | --- | --- | --- |
 | `check-draft` | `check-prose` | Checks an unsaved draft through stdin without creating files. |
 | `review-file` | `check-prose` | Reports file, line, rule, and correction without editing. |
-| `markdown-scope` | `check-prose` | Checks only Markdown files, including uppercase extensions, and never uses `--all`. |
+| `markdown-scope` | `check-prose` | Checks only Markdown files, including uppercase extensions, never passes other files, and never uses `--all`. |
 | `new-findings-baseline` | `check-prose` | Asks for a Git revision instead of choosing a baseline. |
-| `rewrite-file` | `rewrite-prose` | Applies findings, preserves commands and code, and verifies the result. |
+| `rewrite-file` | `rewrite-prose` | Applies findings, preserves commands and code, rechecks after the last edit, and reports what changed. |
 | `no-rule-weakening` | `check-prose`, `rewrite-prose` | Fixes and rechecks prose without disabling rules or adding vocabulary. |
 | `google-write` | `google-prose` | Writes new content in Google style and runs the checker. |
 | `procedural-condition` | `procedural-prose` | Preserves a compound negated condition and its prohibition, then runs the checker. |
