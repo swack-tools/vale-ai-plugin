@@ -81,8 +81,8 @@ The deployment waits for tests and the documentation build. GitHub's Pages
 actions upload and deploy the static artifact with narrowly scoped job
 permissions. The workflow pins action versions to commit hashes.
 
-The Pages custom domain is `vale.swacktech.com`. The Domain Name System (DNS) uses a `CNAME` alias record
-from `vale` to `swack-tools.github.io`, with proxying off in Cloudflare.
+The Pages custom domain is `vale.ai.swacktech.com`. The Domain Name System (DNS) uses a `CNAME` alias record
+from `vale.ai` to `swack-tools.github.io`, with proxying off in Cloudflare.
 GitHub Pages provides the content and Transport Layer Security (TLS) certificate.
 Cloudflare hosts the DNS record. The site needs no Worker.
 

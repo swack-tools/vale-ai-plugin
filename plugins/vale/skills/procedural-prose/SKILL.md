@@ -61,7 +61,7 @@ from editorial advice. Report unchecked files or an unavailable checker.
 A clean lint result doesn't prove meaning preservation. Don't invent official
 STE rule numbers, add a dictionary, or enforce a sentence-length limit.
 
-See the [profile guide](https://vale.swacktech.com/profiles.html) for activation,
+See the [profile guide](https://vale.ai.swacktech.com/profiles.html) for activation,
 coverage, examples, and evaluation limits. The
 [official tool guidance](https://www.asd-ste100.org/STEsoftware.html) explains the
 writer's responsibility. The [Coder proposal](https://github.com/coder/coder/pull/27852)

@@ -110,7 +110,7 @@ complete Google style compliance. For a full audit, run `--all` without a baseli
 A `skipped` result or an entry in `skipped_files` means the wrapper didn't check
 that operand. Report the path and reason, even when other files passed. Don't
 call an excluded document clean or bypass its policy. Reviewed vocabulary and
-format recipes live in the [configuration guide](https://vale.swacktech.com/configuration.html).
+format recipes live in the [configuration guide](https://vale.ai.swacktech.com/configuration.html).
 Don't add accepted terms or weaken exclusions just to clear findings.
 
 ## Check an unsaved draft
@@ -151,4 +151,4 @@ patterns, so `[docs/*.md]` can match both. The checker still resolves and
 validates saved files against the absolute workspace root and returns absolute
 file locations. Don't change project rules silently or claim an unmatched
 empty result proves coverage. See the
-[draft guide](https://vale.swacktech.com/usage.html#check-an-unsaved-draft).
+[draft guide](https://vale.ai.swacktech.com/usage.html#check-an-unsaved-draft).

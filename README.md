@@ -41,9 +41,9 @@ custom `/prompts:vale` commands. The repository includes a legacy prompt templat
 clients that retain custom prompt support. See the
 installation guide for that compatibility path.
 
-[Installation guide](https://vale.swacktech.com/installation.html) ·
-[Commands, skills, and examples](https://vale.swacktech.com/usage.html) ·
-[Marketplace guide](https://vale.swacktech.com/marketplaces.html)
+[Installation guide](https://vale.ai.swacktech.com/installation.html) ·
+[Commands, skills, and examples](https://vale.ai.swacktech.com/usage.html) ·
+[Marketplace guide](https://vale.ai.swacktech.com/marketplaces.html)
 
 ## Usage
 
@@ -58,20 +58,20 @@ installation guide for that compatibility path.
 - **Audit scope:** use `--all` for every eligible workspace file, or
   `--check FILE --scope new-findings --base-ref main` for conservative comparison.
 - **Unsaved drafts:** use `--stdin --ext md --path docs/setup.md --format json`
-  with quoted stdin input. See the [draft workflow](https://vale.swacktech.com/usage.html#check-an-unsaved-draft).
+  with quoted stdin input. See the [draft workflow](https://vale.ai.swacktech.com/usage.html#check-an-unsaved-draft).
 - **Direct checks:** run `python3 plugins/vale/scripts/prose_lint.py --check README.md`.
 
 The checker leaves files unchanged. The agent applies requested corrections.
 A project `.vale.ini` overrides the bundled Google rules. The Stop hook requests
 one correction pass. Final warning visibility depends on the client. See the
-[delivery limits](https://vale.swacktech.com/development.html#feedback-delivery). Vale checks an
+[delivery limits](https://vale.ai.swacktech.com/development.html#feedback-delivery). Vale checks an
 automated subset of the Google style guide. It doesn't format Google Docs.
 
 Automatic new-findings feedback is opt-in through project policy or the installer’s
 `--feedback-scope new-findings` option. It retains initial source text locally
 and falls back to full-file feedback when comparison is uncertain. See the
-[scope and privacy details](https://vale.swacktech.com/behavior.html#initial-document-baselines)
-and the [feature guide](https://vale.swacktech.com/features.html).
+[scope and privacy details](https://vale.ai.swacktech.com/behavior.html#initial-document-baselines)
+and the [feature guide](https://vale.ai.swacktech.com/features.html).
 
 ## Project policy
 
@@ -79,7 +79,7 @@ Use `.vale-plugin.toml` to share file selection and feedback scope across both
 clients. Command options override project settings. Use `.vale.ini` and reviewed
 Vale vocabulary files for terminology. Explicit Views can select OpenAPI
 descriptions without checking identifiers. See the
-[configuration recipes](https://vale.swacktech.com/configuration.html) for
+[configuration recipes](https://vale.ai.swacktech.com/configuration.html) for
 precedence, safe exclusions, vocabulary, and format selection.
 
 ## Procedural writing
@@ -88,7 +88,7 @@ Use `/vale:procedural-prose` in Claude Code or `$vale:procedural-prose` in Codex
 for runbooks and instructions. This experimental skill preserves conditions,
 commands, and requirement strength. The optional `ste-inspired` profile uses
 the same Google checks. It adds no Simplified Technical English enforcement or certification. See the
-[profile guide](https://vale.swacktech.com/profiles.html) for activation,
+[profile guide](https://vale.ai.swacktech.com/profiles.html) for activation,
 project configuration, examples, rollback, and evaluation limits.
 
 ## Hooks without a marketplace
@@ -120,7 +120,7 @@ parsers, and validates both marketplace packages. Eight native jobs cover both
 operating systems, four installation paths, and both feedback scopes. They check
 fresh installs, local plugin updates, and unresolved Stop behavior. The smoke tests use
 the real clients with local model fixtures and temporary configuration. The fixtures need no model account or API key. See the
-[development guide](https://vale.swacktech.com/development.html) for details.
+[development guide](https://vale.ai.swacktech.com/development.html) for details.
 
 GitHub Actions checks pull requests and deploys the documentation only on pushes
 to `main`, including pull request merges. See the [license](LICENSE). Bundled Google rules
@@ -130,7 +130,7 @@ retain their upstream license.
 
 CI reports findings from entire changed documents with the same shared checker
 and project policy. It retains full JSON results and needs no PR write token or
-agent installation. See the [CI guide](https://vale.swacktech.com/ci.html) for
+agent installation. See the [CI guide](https://vale.ai.swacktech.com/ci.html) for
 selection roots, local reproduction, limits, and reuse in another repository.
 
 ## Writing evaluation
@@ -138,7 +138,7 @@ selection roots, local reproduction, limits, and reuse in another repository.
 The source checkout includes twelve labeled prose fixtures and an offline
 validator for paired writing trials. It checks protected literals and requires
 explicit semantic reviews. The real-model pilots remain unrun. The evaluation
-[guide](https://vale.swacktech.com/evaluation.html) explains the canary-first
+[guide](https://vale.ai.swacktech.com/evaluation.html) explains the canary-first
 process, shared-auth limitations, review criteria, and evidence requirements.
 
 ## Diagnostics
@@ -147,4 +147,4 @@ Run `python3 plugins/vale/scripts/prose_lint.py --doctor` to inspect the engine,
 configuration, and optional markup parsers. Doctor has a 20-second total
 budget. Add `--format json` to a file check for structured findings and
 incomplete-check diagnostics. Refer to the
-[command documentation](https://vale.swacktech.com/usage.html) for examples.
+[command documentation](https://vale.ai.swacktech.com/usage.html) for examples.
